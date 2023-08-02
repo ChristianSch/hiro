@@ -3,7 +3,7 @@ package crawl
 import (
 	"github.com/ChristianSch/hiro/protagonist/domain/model/crawl"
 	"net/http"
-	"io"
+	// "io"
 
     "github.com/PuerkitoBio/goquery"
 )
@@ -24,17 +24,18 @@ func (c *NetCrawler) Crawl(url string) (*crawl.CrawlResult, error) {
 	defer res.Body.Close()
 
 	// read body
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
+	// body, err := io.ReadAll(res.Body)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	// parse body for links
 	doc, err := goquery.NewDocumentFromReader(res.Body)
-
 	if err != nil {
 		return nil, err
 	}
+
+	body := doc.Find("body").Text()
 
 	links := []crawl.CrawlReference{}
 
