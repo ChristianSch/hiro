@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package embed;
+
+message EmbeddingRequest {
+    string url = 1;
+    string title = 2;
+    string content = 3;
+    string description = 4;
+}
+
+message EmbeddingResponse {
+    bool success = 1;
+}
+
+service EmbeddingService {
+    // Creates an embedding for the given text.
+    rpc Embed (EmbeddingRequest) returns (EmbeddingResponse) {}
+}
