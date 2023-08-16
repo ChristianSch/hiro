@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package embed;
 
+option go_package = "./adapters/embed/grpc";
+
 message EmbeddingRequest {
     string url = 1;
     string title = 2;

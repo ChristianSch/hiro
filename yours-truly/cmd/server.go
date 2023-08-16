@@ -13,9 +13,8 @@ import (
 
 func main() {
 	// build domain stuff
-	searcher := search.NewSolrSearcher(search.SolarSearcherConfig{
-		Core: "hproto",
-		Host: "http://localhost:8983",
+	searcher := search.NewGrpcSearcher(search.GrpcSearcherConfig{
+		Host: "localhost:50053",
 	})
 	engine := html.New("./views", ".gohtml")
 	app := fiber.New(fiber.Config{
@@ -47,9 +46,10 @@ func main() {
 
 		res, err := searcher.Search(query)
 		if err != nil {
+			zap.L().Error("search failed", zap.Error(err))
 			return err
 		}
-
+		zap.L().Info("search results", zap.Any("results", res))
 		ctx.Set("Hx-Push", fmt.Sprintf("%s/search?q=%s", ctx.BaseURL(), query))
 
 		return ctx.Render("search", fiber.Map{

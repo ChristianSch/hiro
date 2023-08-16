@@ -1,0 +1,15 @@
+.htmx-indicator {
+    background-color: #7cd1cd;
+  }
+body {
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f8f8;
+  }
+
+.logo {
+    font-family: 'Teko', sans-serif;
+    font-size: 4rem;
+    color: #3f3f3f;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+  }

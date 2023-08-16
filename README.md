@@ -35,6 +35,14 @@ and
 python3 -m wintermute.search.server
 ```
 
+### Yours-Truly
+To generate the go client code for the search service, run:
+```bash
+protoc -I=../proto --go_out=adapters/search/grpc --go_opt=paths=source_relative \              (base) 7.3m  Wed Aug 16 17:34:52 2023
+                                            --go-grpc_out=adapters/search/grpc --go-grpc_opt=paths=source_relative \
+                                         ../proto/search.proto
+```
+
 ### Database Setup
 We use postgres and need the following setup:
 

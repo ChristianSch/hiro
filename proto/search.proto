@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package search;
 
+option go_package = "./adapters/search/grpc";
+
 message SearchRequest {
   string query = 1;
   int32 page_number = 2;
