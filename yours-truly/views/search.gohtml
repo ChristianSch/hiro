@@ -1,0 +1,36 @@
+<div id="search-container">
+    <div class="mx-auto w-lg text-center">
+        <a href="/"><h1 class="logo">Hiro</h1></a>
+        <div class="p-8 max-w-xl mx-auto">
+            <input hx-get="/htmx/search" hx-target="#search-container" hx-swap="outerHTML" type="text" name="q" id="search" class="w-full p-2 border border-gray-300 rounded shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Search..." value="{{ .query }}"/>
+        </div>
+    </div>
+
+    <div id="search-results" class="">
+    {{if .results }}
+        <div class="text-gray-400">
+            Found {{ len .results }} results for <span>"{{ .query }}"</span>
+        </div>
+        {{range $index, $value := .results}}
+            <div class="py-3">
+                <div>
+                    <h2 class=""><a class="text-blue-600 hover:underline" href="{{ $value.Url }}">{{ $value.Title }}</a></h2>
+                    <p>{{ $value.Host }} › </p>
+                    <p class="text-gray-500">{{ $value.Description }} <!--... <a class="text-blue-600 hover:underline" href="{{ $value.Url}}"> ›&nbsp;read more</a>--></p>
+                    
+                </div>
+            </div>
+        {{else}}
+            <div class="flex flex-col justify-center items-center">
+                <div class="flex flex-col justify-center items-center">
+                    <h2 class="font-bold">No results found</h2>
+                </div>
+            </div>
+        {{end}}
+    {{else}}
+        {{ if .query }}
+            We couldn't find any results for: {{ .query }}. Sorry :(
+        {{end}}
+    {{end}}
+    </div>
+</div>
