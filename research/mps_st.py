@@ -31,6 +31,7 @@ create or replace function match_documents (
 )
 returns table (
   id bigint,
+  url text,
   content text,
   similarity float
 )
