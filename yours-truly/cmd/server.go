@@ -58,6 +58,24 @@ func main() {
 		}, "layouts/empty")
 	})
 
+	app.Get("/search", func(ctx *fiber.Ctx) error {
+		query := ctx.Query("q")
+		logger.Info("search", zap.String("query", query))
+
+		res, err := searcher.Search(query)
+		if err != nil {
+			zap.L().Error("search failed", zap.Error(err))
+			return err
+		}
+		zap.L().Info("search results", zap.Any("results", res))
+		ctx.Set("Hx-Push", fmt.Sprintf("%s/search?q=%s", ctx.BaseURL(), query))
+
+		return ctx.Render("search", fiber.Map{
+			"results": res,
+			"query":   query,
+		}, "layouts/main")
+	})
+
 	if err := app.Listen(fmt.Sprintf(":%d", 8973)); err != nil {
 		panic(err)
 	}

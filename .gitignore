@@ -2,3 +2,4 @@ crawl
 *.pyc
 __pycache__
 *.so
+__debug_bin
