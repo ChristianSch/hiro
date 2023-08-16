@@ -7,9 +7,8 @@ import (
 
 func main() {
 	crawler := crawl.NewNetCrawler()
-	indexer := index.NewSolrIndexer(index.SolarIndexerConfig{
-		Core: "hproto",
-		Host: "http://localhost:8983",
+	indexer := index.NewWintermuteIndexer(index.WintermuteConfig{
+		Host: "localhost:50052",
 	})
 	res, err := crawler.Crawl("https://andinfinity.eu")
 	if err != nil {
@@ -19,6 +18,8 @@ func main() {
 	println("Crawled:")
 	println(res.Url)
 	println(res.Title)
+	println(res.Description)
+
 	// println(res.Body)
 
 	// add to solar

@@ -1,32 +1,37 @@
 # Hiro Search + AI Knowledgebase
 
 ## Components
-- Protagonist: Crawler
-- Wintermute: indexer + query engine
-- Yours-Truly: Search UI
-- postgres + pgvector: Database and embedding storage as well as search
+
+-   Protagonist: Crawler
+-   Wintermute: indexer + query engine
+-   Yours-Truly: Search UI
+-   postgres + pgvector: Database and embedding storage as well as search
 
 ## Development & Building
+
 ### Wintermute
+
 To generate your server code, run:
+
 ```bash
 python3 -m grpc_tools.protoc -I proto --python_out=wintermute/embed/stubs --pyi_out=wintermute/embed/stubs --grpc_python_out=wintermute/embed/stubs proto/embedding.proto
 ```
 
 and:
-    
+
 ```bash
 python3 -m grpc_tools.protoc -I proto --python_out=wintermute/search/stubs --pyi_out=wintermute/search/stubs --grpc_python_out=wintermute/search/stubs proto/search.proto
 ```
 
 We need to fix up some imports for now:
+
 1. in `wintermute/embed/embedding_pb2_grpc.py`, change `import embedding_pb2 as embedding__pb2` to `from . import embedding_pb2 as embedding__pb2`
 2. in `wintermute/search/search_pb2_grpc.py`, change `import search_pb2 as search__pb2` to `from . import search_pb2 as search__pb2`
 
 You can run these grpc services with:
 
 ```bash
-python3 -m wintermute.embed.server    
+python3 -m wintermute.embed.server
 ```
 
 and
@@ -36,11 +41,23 @@ python3 -m wintermute.search.server
 ```
 
 ### Yours-Truly
+
 To generate the go client code for the search service, run:
+
 ```bash
-protoc -I=../proto --go_out=adapters/search/grpc --go_opt=paths=source_relative \              (base) 7.3m  Wed Aug 16 17:34:52 2023
-                                            --go-grpc_out=adapters/search/grpc --go-grpc_opt=paths=source_relative \
-                                         ../proto/search.proto
+protoc -I=../proto --go_out=adapters/search/grpc --go_opt=paths=source_relative \
+    --go-grpc_out=adapters/search/grpc --go-grpc_opt=paths=source_relative \
+    ../proto/search.proto
+```
+
+### Protagonist
+
+To generate the go client code for the embedding service, run:
+
+````bash
+protoc -I=../proto --go_out=adapters/index/grpc --go_opt=paths=source_relative \
+    --go-grpc_out=adapters/index/grpc --go-grpc_opt=paths=source_relative \
+    ../proto/embedding.proto
 ```
 
 ### Database Setup
@@ -50,9 +67,10 @@ We use postgres and need the following setup:
 ```postgresql
 \c hiro
 create extension vector;
-```
+````
 
 1. as hiro
+
 ```postgresql
 create table documents (
   id bigserial primary key,
@@ -65,6 +83,7 @@ create table documents (
 ```
 
 2.
+
 ```postgresql
 create or replace function match_documents (
   query_embedding vector(768),
@@ -96,6 +115,7 @@ $$;
 ```
 
 3.
+
 ```postgresql
 create index on documents using ivfflat (embedding vector_cosine_ops)
 with

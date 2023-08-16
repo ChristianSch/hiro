@@ -1,11 +1,11 @@
 package crawl
 
 import (
-	"github.com/ChristianSch/hiro/protagonist/domain/model/crawl"
 	"net/http"
-	// "io"
 
-    "github.com/PuerkitoBio/goquery"
+	"github.com/ChristianSch/hiro/protagonist/domain/model/crawl"
+
+	"github.com/PuerkitoBio/goquery"
 )
 
 type NetCrawler struct {
@@ -23,12 +23,6 @@ func (c *NetCrawler) Crawl(url string) (*crawl.CrawlResult, error) {
 
 	defer res.Body.Close()
 
-	// read body
-	// body, err := io.ReadAll(res.Body)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	// parse body for links
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
@@ -45,10 +39,14 @@ func (c *NetCrawler) Crawl(url string) (*crawl.CrawlResult, error) {
 		println(link)
 	})
 
+	title := doc.Find("title").Text()
+	description, _ := doc.Find("meta[name=description]").Attr("content")
+
 	return &crawl.CrawlResult{
-		Url: url,
-		Title: "",
-		Body: string(body),
-		References: links,
+		Url:         url,
+		Title:       title,
+		Description: description,
+		Body:        string(body),
+		References:  links,
 	}, nil
 }
