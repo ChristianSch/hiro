@@ -38,13 +38,16 @@ class EmbeddingServer(EmbeddingServiceServicer):
 
         with self._conn.cursor() as cur:
             cur.execute(
-                'INSERT INTO documents (url, title, content, description, embedding) VALUES (%s, %s, %s, %s, %s)',
-                (url, title, content, description, embedding,)
+                'INSERT INTO documents (url, title, content, description, embedding) VALUES (%(url)s, %(title)s, %(content)s, %(description)s, %(embedding)s) ' +
+                'ON CONFLICT (url) DO UPDATE SET (title, content, description, embedding) = (EXCLUDED.title, EXCLUDED.content, EXCLUDED.description, EXCLUDED.embedding)',
+                {'url': url, 'title': title, 'content': content,
+                    'description': description, 'embedding': embedding, }
             )
             self._conn.commit()
 
     def Embed(self, request: EmbeddingRequest, context):
-        self._embed(request.url, request.title, request.content, request.description)
+        self._embed(request.url, request.title,
+                    request.content, request.description)
 
         context.set_code(grpc.StatusCode.OK)
 

@@ -74,11 +74,12 @@ create extension vector;
 ```postgresql
 create table documents (
   id bigserial primary key,
-  url text,
+  url text UNIQUE NOT NULL,
   title text,
   content text,
   description text,
-  embedding vector(768)
+  embedding vector(768) NOT NULL,
+  CONSTRAINT unique_url UNIQUE (url)
 );
 ```
 

@@ -3,29 +3,23 @@ package main
 import (
 	"github.com/ChristianSch/hiro/protagonist/adapters/crawl"
 	"github.com/ChristianSch/hiro/protagonist/adapters/index"
+	"github.com/ChristianSch/hiro/protagonist/infra/logging"
+	"go.uber.org/zap"
 )
 
 func main() {
-	crawler := crawl.NewNetCrawler()
+	logger := logging.InitLogger(true)
+	zap.ReplaceGlobals(logger)
+
 	indexer := index.NewWintermuteIndexer(index.WintermuteConfig{
 		Host: "localhost:50052",
 	})
-	res, err := crawler.Crawl("https://andinfinity.eu")
+	crawler := crawl.NewCollyCrawler(crawl.CollyConfig{
+		Indexer: indexer,
+	})
+	err := crawler.Crawl("https://andinfinity.eu")
 	if err != nil {
 		panic(err)
 	}
-
-	println("Crawled:")
-	println(res.Url)
-	println(res.Title)
-	println(res.Description)
-
-	// println(res.Body)
-
-	// add to solar
-	println("Indexing...")
-	err = indexer.PutPage(*res)
-	if err != nil {
-		panic(err)
-	}
+	logger.Info("crawling finished")
 }

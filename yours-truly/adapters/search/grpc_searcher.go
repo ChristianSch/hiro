@@ -24,6 +24,7 @@ type SearchResult struct {
 	Title       string
 	Url         string
 	Host        string
+	Page        string
 	Description string
 }
 
@@ -67,11 +68,10 @@ func (s *GrpcSearcher) Search(query string) ([]*SearchResult, error) {
 			Title:       res.Title,
 			Url:         res.Url,
 			Host:        host,
+			Page:        u.Path,
 			Description: res.Description,
 		}
 	}
-
-	zap.L().Info("search results", zap.Any("results", out))
 
 	return out, nil
 }

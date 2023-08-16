@@ -12,12 +12,12 @@
             Found {{ len .results }} results for <span>"{{ .query }}"</span>
         </div>
         {{range $index, $value := .results}}
-            <div class="py-3">
+            <div class="py-3 search-result">
                 <div>
                     <h2 class=""><a class="text-blue-600 hover:underline" href="{{ $value.Url }}">{{ $value.Title }}</a></h2>
-                    <p>{{ $value.Host }} › </p>
-                    <p class="text-gray-500">{{ $value.Description }} <!--... <a class="text-blue-600 hover:underline" href="{{ $value.Url}}"> ›&nbsp;read more</a>--></p>
-                    
+                    <p class="text-sm py-1">{{ $value.Host }}{{if $value.Page}} › {{ $value.Page }}{{end}}</p>
+                    <p class="text-gray-500 search-result-descr">{{ if $value.Description}}{{ $value.Description }}{{else}}No description{{end}}
+                     <!--... <a class="text-blue-600 hover:underline" href="{{ $value.Url}}"> ›&nbsp;read more</a>--></p>
                 </div>
             </div>
         {{else}}
@@ -33,4 +33,15 @@
         {{end}}
     {{end}}
     </div>
+    <script lang="text/javascript">
+        var results = document.getElementsByClassName("search-result-descr");
+        var terms = {{ .query }}.split(" ");
+
+        for (var j = 0; j < results.length; j++) {
+            for (var i = 0; i < terms.length; i++) {
+                var term = terms[i];
+                results[j].innerHTML = results[j].innerHTML.replace(new RegExp(term, "gi"), (match) => `<mark>${match}</mark>`);
+            }
+        }
+    </script>
 </div>

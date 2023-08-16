@@ -49,7 +49,6 @@ func main() {
 			zap.L().Error("search failed", zap.Error(err))
 			return err
 		}
-		zap.L().Info("search results", zap.Any("results", res))
 		ctx.Set("Hx-Push", fmt.Sprintf("%s/search?q=%s", ctx.BaseURL(), query))
 
 		return ctx.Render("search", fiber.Map{
@@ -67,7 +66,6 @@ func main() {
 			zap.L().Error("search failed", zap.Error(err))
 			return err
 		}
-		zap.L().Info("search results", zap.Any("results", res))
 		ctx.Set("Hx-Push", fmt.Sprintf("%s/search?q=%s", ctx.BaseURL(), query))
 
 		return ctx.Render("search", fiber.Map{
