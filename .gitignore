@@ -1,6 +1,5 @@
-crawl
-hiro
-crawl
+./crawl
+./hiro
 *.pyc
 __pycache__
 *.so
