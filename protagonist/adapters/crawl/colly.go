@@ -2,6 +2,7 @@ package crawl
 
 import (
 	"bytes"
+	"time"
 
 	"github.com/ChristianSch/hiro/protagonist/domain/model/crawl"
 	"github.com/ChristianSch/hiro/protagonist/domain/model/index"
@@ -32,9 +33,15 @@ func NewCollyCrawler(cfg CollyConfig) *CollyCrawler {
 
 	c := colly.NewCollector(
 		colly.MaxDepth(maxDepth),
+		colly.Async(true),
 		// rate limit
 		// random user agent
 	)
+
+	c.Limit(&colly.LimitRule{
+		RandomDelay: 2 * time.Second,
+		Parallelism: 2,
+	})
 
 	extensions.RandomUserAgent(c)
 
