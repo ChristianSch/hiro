@@ -1,0 +1,17 @@
+[
+  {
+    "query": "contact support",
+    "relevant_urls": [
+      "https://example.com/contact",
+      "https://example.com/help"
+    ]
+  },
+  {
+    "query": "pricing plans",
+    "relevance": {
+      "https://example.com/pricing": 2,
+      "https://example.com/plans": 2,
+      "https://example.com/blog/how-pricing-works": 1
+    }
+  }
+]

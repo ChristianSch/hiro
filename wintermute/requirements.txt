@@ -1,5 +1,5 @@
 psycopg==3.1.10
-pgvector==0.2.1
+pgvector==0.3.6
 sentence-transformers==2.2.2
 pandas==2.0.3
 grpcio-reflection==1.57.0
