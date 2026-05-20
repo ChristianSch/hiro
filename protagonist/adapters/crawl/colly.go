@@ -2,6 +2,8 @@ package crawl
 
 import (
 	"bytes"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/ChristianSch/hiro/protagonist/domain/model/crawl"
@@ -64,6 +66,23 @@ func NewCollyCrawler(cfg CollyConfig) *CollyCrawler {
 	}
 }
 
+func normalizeURL(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+
+	u.Fragment = ""
+	u.Scheme = strings.ToLower(u.Scheme)
+	u.Host = strings.ToLower(u.Host)
+
+	if u.Path != "/" {
+		u.Path = strings.TrimRight(u.Path, "/")
+	}
+
+	return u.String()
+}
+
 func (c *CollyCrawler) Crawl(url string) error {
 	c.c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		e.Request.Visit(e.Attr("href"))
@@ -72,14 +91,14 @@ func (c *CollyCrawler) Crawl(url string) error {
 	var err error = nil
 
 	c.c.OnResponse(func(res *colly.Response) {
-		pageUrl := res.Request.URL.String()
+		pageUrl := normalizeURL(res.Request.URL.String())
 		zap.L().Info("received response", zap.String("url", pageUrl))
 		// convert body to reader
 		body := bytes.NewReader(res.Body)
 
 		// parse body for links
 		doc, err2 := goquery.NewDocumentFromReader(body)
-		if err != nil {
+		if err2 != nil {
 			err = err2
 		} else {
 			bodyText := doc.Find("body").Text()
@@ -118,7 +137,15 @@ func (c *CollyCrawler) Crawl(url string) error {
 		zap.L().Info("Visiting", zap.String("url", r.URL.String()))
 	})
 
-	c.c.Visit(url)
+	c.c.OnError(func(res *colly.Response, err error) {
+		zap.L().Error("crawl request failed", zap.String("url", res.Request.URL.String()), zap.Error(err))
+	})
+
+	if visitErr := c.c.Visit(url); visitErr != nil {
+		return visitErr
+	}
+
+	c.c.Wait()
 
 	return err
 }
