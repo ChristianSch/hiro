@@ -3,7 +3,7 @@
 
 Run from the repository root while Wintermute's search service is running:
 
-    python3 eval/run_eval.py --queries eval/queries.json --host localhost:50053
+    uv run python eval/run_eval.py --queries eval/queries.json --host localhost:50053
 
 Query file format:
 
