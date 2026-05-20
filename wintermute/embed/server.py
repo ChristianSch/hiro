@@ -23,13 +23,13 @@ class EmbeddingServer(EmbeddingServiceServicer):
 
     def _init_db(self):
         conn = psycopg.connect(
-            "dbname=hiro user=hiro password=hiro host=localhost port=5432")
+            "dbname=hiro user=hiro password=hiro host=localhost port=51432")
         register_vector(conn)
         self._conn = conn
         logging.info('Database connection established.')
 
     def __del__(self):
-        if self._conn.closed == 0:
+        if self._conn is not None and self._conn.closed == 0:
             self._conn.close()
             logging.info('Database connection closed.')
 

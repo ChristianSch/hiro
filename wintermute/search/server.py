@@ -23,13 +23,13 @@ class SearchServer(SearchServiceServicer):
 
     def _init_db(self):
         conn = psycopg.connect(
-            "dbname=hiro user=hiro password=hiro host=localhost port=5432")
+            "dbname=hiro user=hiro password=hiro host=localhost port=51432")
         register_vector(conn)
         self._conn = conn
         logging.info('Database connection established.')
 
     def __del__(self):
-        if self._conn.closed == 0:
+        if self._conn is not None and self._conn.closed == 0:
             self._conn.close()
             logging.info('Database connection closed.')
 
@@ -40,7 +40,9 @@ class SearchServer(SearchServiceServicer):
 
             with self._conn.cursor() as cur:
                 res = cur.execute(
-                    'SELECT match_documents(%s, 0.78, 10)', (search,)).fetchall()
+                    'SELECT * FROM match_documents(%s, %s, 0.78, 10)',
+                    (search, request.query),
+                ).fetchall()
 
             context.set_code(grpc.StatusCode.OK)
 
@@ -54,12 +56,12 @@ class SearchServer(SearchServiceServicer):
             # 3. document title
             # 4. document content
             # 5. document description
-            # 6. similarity score
+            # 6. hybrid similarity score
             return SearchResponse(results=[SearchResponse.Result(
-                url=r[0][1],
-                title=r[0][2],
-                content=r[0][3],
-                description=r[0][4],
+                url=r[1],
+                title=r[2],
+                content=r[3],
+                description=r[4],
             ) for r in res])
 
         except Exception as e:

@@ -40,3 +40,9 @@ $$;
 
 create index if not exists documents_embedding_hnsw_idx
   on documents using hnsw (embedding vector_cosine_ops);
+
+---- create above / drop below ----
+drop index if exists documents_embedding_hnsw_idx;
+drop function if exists match_documents(vector(768), float, int);
+drop table if exists documents;
+drop extension if exists vector;

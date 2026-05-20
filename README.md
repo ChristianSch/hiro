@@ -62,19 +62,18 @@ The search service is implemented in:
 wintermute/search/server.py
 ```
 
-It receives search queries using the service defined in `proto/search.proto`. For each query, it creates an embedding with the same model, calls the Postgres `match_documents(...)` function, and returns the most similar documents.
+It receives search queries using the service defined in `proto/search.proto`. For each query, it creates an embedding with the same model, calls the Postgres `match_documents(...)` function, and returns the highest-ranked hybrid matches.
 
 ### Postgres + pgvector: storage and retrieval
 
 Postgres stores the crawled documents and their embeddings in a `documents` table. The `embedding` column uses pgvector's `vector(768)` type, matching the output size of `BAAI/bge-base-en`.
 
-Search is performed by comparing the query embedding against stored document embeddings using pgvector cosine distance:
+Search uses a hybrid ranking strategy:
 
-```sql
-1 - (documents.embedding <=> query_embedding) as similarity
-```
+- semantic similarity via pgvector cosine distance
+- keyword relevance via PostgreSQL full-text search using `tsvector`, `websearch_to_tsquery`, and `ts_rank_cd`
 
-The README setup below creates the table, the `match_documents(...)` helper function, and an HNSW vector index.
+The current fixed ranking blend is `70%` semantic similarity and `30%` keyword relevance. The README setup below creates the table, the `match_documents(...)` helper function, an HNSW vector index, and a GIN full-text index.
 
 ### Yours-Truly: web search UI
 
@@ -143,7 +142,7 @@ or graded relevance for NDCG:
 Then run it while the Wintermute search service is running:
 
 ```bash
-python3 eval/run_eval.py --queries eval/queries.json --host localhost:50053
+uv run python eval/run_eval.py --queries eval/queries.json --host localhost:50053
 ```
 
 The harness reports:
@@ -157,8 +156,8 @@ The harness reports:
 Useful options:
 
 ```bash
-python3 eval/run_eval.py --queries eval/queries.json --k 1 5 10 --show-cases
-python3 eval/run_eval.py --queries eval/queries.json --json-output eval/results.json
+uv run python eval/run_eval.py --queries eval/queries.json --k 1 5 10 --show-cases
+uv run python eval/run_eval.py --queries eval/queries.json --json-output eval/results.json
 ```
 
 ### Current caveats
@@ -170,31 +169,35 @@ python3 eval/run_eval.py --queries eval/queries.json --json-output eval/results.
 ## Components
 
 -   Protagonist: Crawler
--   Wintermute: indexer + query engine
+-   Wintermute: indexer + hybrid query engine
 -   Yours-Truly: Search UI
--   postgres + pgvector: Database and embedding storage as well as search
+-   postgres + pgvector: Database, embedding storage, full-text search, and vector search
 
 ## Development & Building
 
 ### Quick start
 
-Start Postgres with pgvector:
+Start Postgres with pgvector and run database migrations:
 
 ```bash
 docker compose up -d postgres
+go install github.com/jackc/tern/v2@latest # if tern is not already installed
+tern migrate --migrations db/migrations --config db/tern.conf
 ```
 
-Install Python dependencies:
+Install Python dependencies with uv:
 
 ```bash
-python3 -m pip install -r wintermute/requirements.txt
+uv sync
 ```
+
+If you do not have uv installed, see https://docs.astral.sh/uv/getting-started/installation/.
 
 Run Wintermute's embedding and search services in separate terminals:
 
 ```bash
-python3 -m wintermute.embed.server
-python3 -m wintermute.search.server
+uv run python -m wintermute.embed.server
+uv run python -m wintermute.search.server
 ```
 
 Crawl a site into the embedding index:
@@ -219,17 +222,32 @@ http://localhost:8973
 
 ### Database setup
 
-`docker-compose.yml` starts Postgres with pgvector and automatically runs `docker/postgres/init.sql`, which creates:
+`docker-compose.yml` starts Postgres with pgvector on host port `51432`. Schema changes are managed with [tern](https://github.com/jackc/tern).
+
+Install tern if needed:
+
+```bash
+go install github.com/jackc/tern/v2@latest
+```
+
+Run migrations:
+
+```bash
+tern migrate --migrations db/migrations --config db/tern.conf
+```
+
+The migrations create:
 
 - the `vector` extension
 - the `documents` table
-- the `match_documents(...)` search function
+- the `match_documents(...)` hybrid search function
 - the HNSW embedding index
+- the generated full-text `search_vector` column and GIN index
 
 The local development defaults match the current application code:
 
 ```text
-dbname=hiro user=hiro password=hiro host=localhost port=5432
+dbname=hiro user=hiro password=hiro host=localhost port=51432
 ```
 
 ### Generated gRPC stubs
@@ -239,13 +257,13 @@ Generated gRPC stubs are committed intentionally so normal development does not 
 Python stubs for Wintermute:
 
 ```bash
-python3 -m grpc_tools.protoc -I proto \
+uv run python -m grpc_tools.protoc -I proto \
   --python_out=wintermute/embed/stubs \
   --pyi_out=wintermute/embed/stubs \
   --grpc_python_out=wintermute/embed/stubs \
   proto/embedding.proto
 
-python3 -m grpc_tools.protoc -I proto \
+uv run python -m grpc_tools.protoc -I proto \
   --python_out=wintermute/search/stubs \
   --pyi_out=wintermute/search/stubs \
   --grpc_python_out=wintermute/search/stubs \
