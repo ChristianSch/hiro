@@ -1,0 +1,22 @@
+[project]
+name = "hiro"
+version = "0.1.0"
+description = "Local semantic search engine and AI knowledgebase"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Christian Schulze" }
+]
+dependencies = [
+  "grpcio==1.57.0",
+  "grpcio-reflection==1.57.0",
+  "grpcio-tools==1.57.0",
+  "pandas==2.2.3",
+  "pgvector==0.3.6",
+  "psycopg==3.1.10",
+  "sentence-transformers==3.3.1",
+]
+
+[tool.uv]
+package = false
