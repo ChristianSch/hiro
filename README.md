@@ -175,6 +175,16 @@ uv run python eval/run_eval.py --queries eval/queries.json --json-output eval/re
 
 ### Quick start
 
+Using [case](https://github.com/christiansch/case), you can run hiro and it's components very easily: 
+
+```bash
+casectl up
+```
+
+The UI is exposed at [http://127.0.0.1:8973](http://127.0.0.1:8973). Make sure to crawl some pages (see below) to actually get some search results ;)
+
+### Manual Setup
+
 Start Postgres with pgvector and run database migrations:
 
 ```bash

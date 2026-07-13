@@ -1,0 +1,64 @@
+# Using case to start/monitor services with autoreload + change detection support: https://github.com/christiansch/case
+version: 1
+project: hiro
+
+settings:
+  shutdown_timeout: 5s
+  debounce: 250ms
+  log_history: 2000
+
+services:
+  postgres:
+    run: docker compose up postgres
+    health:
+      command: pg_isready -h localhost -p 51432 -U hiro
+      interval: 2s
+      timeout: 30s
+
+  migrations:
+    type: task
+    run: tern migrate --migrations db/migrations --config db/tern.conf
+    depends_on:
+      postgres: healthy
+
+  embed:
+    run: uv run python -m wintermute.embed.server
+    watch:
+      - wintermute/embed/**/*.py
+      - pyproject.toml
+      - uv.lock
+    depends_on:
+      migrations: completed
+    health:
+      tcp: localhost:50052
+      interval: 1s
+      timeout: 90s
+    restart:
+      policy: on-failure
+      max_attempts: 5
+      backoff: 1s
+
+  search:
+    run: uv run python -m wintermute.search.server
+    watch:
+      - wintermute/search/**/*.py
+      - pyproject.toml
+      - uv.lock
+    depends_on:
+      migrations: completed
+    health:
+      tcp: localhost:50053
+
+  web:
+    path: yours-truly
+    run: go run ./cmd
+    watch:
+      - "**/*.go"
+      - views/**/*.gohtml
+      - static/*.css
+    ignore:
+      - static/**
+    depends_on:
+      search: healthy
+    health:
+      http: http://localhost:8973/htmx/status
