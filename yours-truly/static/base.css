@@ -231,7 +231,27 @@ body {
 }
 
 #search-container {
-  box-sizing: border-box;
-  width: min(100%, 1000px);
-  padding: 0 clamp(1rem, 4vw, 2rem);
+    box-sizing: border-box;
+    width: min(64rem, calc(100vw - 2rem));
+    max-width: 100%;
+    margin-inline: auto;
+    padding-inline: clamp(0rem, 2vw, 1rem);
+}
+
+#search-results {
+    width: 100%;
+    min-height: clamp(18rem, 45vh, 34rem);
+}
+
+.search-result,
+.search-result > div {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.search-result h2,
+.search-result p,
+.search-result a {
+    max-width: 100%;
+    overflow-wrap: anywhere;
 }
