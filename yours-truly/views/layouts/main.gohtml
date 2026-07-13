@@ -1,10 +1,14 @@
 <!DOCTYPE html>
 <html lang="en"
   x-data="{
-      darkMode: localStorage.getItem('darkMode')
-      || localStorage.setItem('darkMode', 'system')}"
-  x-init="$watch('darkMode', val => localStorage.setItem('darkMode', val))"
-  x-bind:class="{'dark': darkMode === 'dark' || (darkMode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)}">
+      darkMode: localStorage.getItem('darkMode') || 'system',
+      isDark() {
+        return this.darkMode === 'dark'
+          || (this.darkMode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+      }
+    }"
+  x-init="localStorage.setItem('darkMode', darkMode); $watch('darkMode', val => localStorage.setItem('darkMode', val))"
+  x-bind:class="{'dark': isDark()}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,6 +20,20 @@
     <title>Hiro :: Search Engine</title>
 </head>
   <body class="leading-normal tracking-normal flex flex-col min-h-screen" hx-boost="true" id="content">
+  <button type="button"
+          class="theme-toggle"
+          x-on:click="darkMode = isDark() ? 'light' : 'dark'"
+          x-bind:aria-pressed="isDark().toString()"
+          x-bind:aria-label="isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+          x-bind:title="isDark() ? 'Switch to light mode' : 'Switch to dark mode'">
+    <svg x-cloak x-show="isDark()" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="4"></circle>
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"></path>
+    </svg>
+    <svg x-cloak x-show="!isDark()" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"></path>
+    </svg>
+  </button>
   <div class="h-full mx-auto justify-between items-center">
     <main class="container">
       {{embed}}
