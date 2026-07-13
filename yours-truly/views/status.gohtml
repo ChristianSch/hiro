@@ -1,7 +1,7 @@
 <span id="search-status"
       class="footer-status {{if .operational}}footer-status--operational{{else}}footer-status--unavailable{{end}}"
       hx-get="/htmx/status"
-      hx-trigger="every 10s"
+      hx-trigger="every 5s"
       hx-swap="outerHTML"
       role="status"
       aria-live="polite"
