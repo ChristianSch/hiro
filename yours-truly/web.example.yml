@@ -1,0 +1,12 @@
+http:
+  address: 127.0.0.1:8973
+  read_timeout: 10s
+  write_timeout: 15s
+  idle_timeout: 60s
+  body_limit: 65536
+  search_rate_limit: 60
+
+search:
+  address: 127.0.0.1:50053
+  timeout: 5s
+  insecure: true

@@ -8,11 +8,11 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/ChristianSch/hiro/yours-truly/adapters/search"
+	appconfig "github.com/ChristianSch/hiro/yours-truly/config"
 	"github.com/ChristianSch/hiro/yours-truly/infra/logging"
 	"github.com/gofiber/contrib/fiberzap"
 	"github.com/gofiber/fiber/v2"
@@ -25,17 +25,22 @@ import (
 const maxQueryBytes = 512
 
 func main() {
-	logger := logging.InitLogger(boolEnv("HIRO_DEBUG", false))
+	cfg, err := appconfig.Load()
+	if err != nil {
+		panic(err)
+	}
+
+	logger := logging.InitLogger(cfg.Debug)
 	defer logger.Sync()
 	undo := zap.ReplaceGlobals(logger)
 	defer undo()
 
 	searcher, err := search.NewGrpcSearcher(search.GrpcSearcherConfig{
-		Host:       envOrDefault("HIRO_SEARCH_GRPC_ADDRESS", "127.0.0.1:50053"),
-		Token:      os.Getenv("HIRO_SERVICE_TOKEN"),
-		Timeout:    durationEnv("HIRO_REQUEST_TIMEOUT", 5*time.Second),
-		Insecure:   boolEnv("HIRO_GRPC_INSECURE", true),
-		ServerName: os.Getenv("HIRO_GRPC_SERVER_NAME"),
+		Host:       cfg.Search.Address,
+		Token:      cfg.Search.Token,
+		Timeout:    cfg.Search.Timeout,
+		Insecure:   cfg.Search.Insecure,
+		ServerName: cfg.Search.ServerName,
 	})
 	if err != nil {
 		logger.Fatal("initialize search client", zap.Error(err))
@@ -47,10 +52,10 @@ func main() {
 		Views:                   engine,
 		ViewsLayout:             "layouts/main",
 		EnableTrustedProxyCheck: true,
-		ReadTimeout:             durationEnv("HIRO_HTTP_READ_TIMEOUT", 10*time.Second),
-		WriteTimeout:            durationEnv("HIRO_HTTP_WRITE_TIMEOUT", 15*time.Second),
-		IdleTimeout:             durationEnv("HIRO_HTTP_IDLE_TIMEOUT", 60*time.Second),
-		BodyLimit:               intEnv("HIRO_HTTP_BODY_LIMIT", 64*1024),
+		ReadTimeout:             cfg.HTTP.ReadTimeout,
+		WriteTimeout:            cfg.HTTP.WriteTimeout,
+		IdleTimeout:             cfg.HTTP.IdleTimeout,
+		BodyLimit:               cfg.HTTP.BodyLimit,
 		ErrorHandler: func(ctx *fiber.Ctx, handlerErr error) error {
 			status := fiber.StatusInternalServerError
 			var fiberErr *fiber.Error
@@ -75,7 +80,7 @@ func main() {
 	app.Use(fiberzap.New(fiberzap.Config{Logger: logger}))
 
 	searchLimiter := limiter.New(limiter.Config{
-		Max:        intEnv("HIRO_SEARCH_RATE_LIMIT", 60),
+		Max:        cfg.HTTP.SearchLimit,
 		Expiration: time.Minute,
 		LimitReached: func(ctx *fiber.Ctx) error {
 			return fiber.NewError(fiber.StatusTooManyRequests, "search rate limit exceeded")
@@ -129,7 +134,7 @@ func main() {
 	htmx.Get("/search", searchLimiter, runSearch("layouts/empty", true))
 	app.Get("/search", searchLimiter, runSearch("layouts/main", false))
 
-	listenAddress := envOrDefault("HIRO_HTTP_ADDRESS", "127.0.0.1:8973")
+	listenAddress := cfg.HTTP.Address
 	serverErr := make(chan error, 1)
 	go func() {
 		serverErr <- app.Listen(listenAddress)
@@ -150,47 +155,4 @@ func main() {
 			logger.Error("graceful shutdown failed", zap.Error(err))
 		}
 	}
-}
-
-func envOrDefault(name, fallback string) string {
-	if value := os.Getenv(name); value != "" {
-		return value
-	}
-	return fallback
-}
-
-func boolEnv(name string, fallback bool) bool {
-	raw := os.Getenv(name)
-	if raw == "" {
-		return fallback
-	}
-	value, err := strconv.ParseBool(raw)
-	if err != nil {
-		panic(fmt.Errorf("invalid %s: %w", name, err))
-	}
-	return value
-}
-
-func intEnv(name string, fallback int) int {
-	raw := os.Getenv(name)
-	if raw == "" {
-		return fallback
-	}
-	value, err := strconv.Atoi(raw)
-	if err != nil || value <= 0 {
-		panic(fmt.Errorf("invalid %s integer %q", name, raw))
-	}
-	return value
-}
-
-func durationEnv(name string, fallback time.Duration) time.Duration {
-	raw := os.Getenv(name)
-	if raw == "" {
-		return fallback
-	}
-	value, err := time.ParseDuration(raw)
-	if err != nil || value <= 0 {
-		panic(fmt.Errorf("invalid %s duration %q", name, raw))
-	}
-	return value
 }
