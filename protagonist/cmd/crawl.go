@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"path/filepath"
 
 	"github.com/ChristianSch/hiro/protagonist/adapters/crawl"
 	"github.com/ChristianSch/hiro/protagonist/adapters/index"
@@ -11,16 +12,28 @@ import (
 )
 
 func main() {
-	cfg, err := appconfig.Load()
+	configDir := flag.String("config-dir", "../config", "directory containing global.yml and crawler.yml")
+	startURL := flag.String("url", "", "starting point of crawling")
+	maxDepth := flag.Int("max-depth", 0, "override maximum crawl depth")
+	debug := flag.Bool("debug", false, "enable debug logging")
+	flag.Parse()
+
+	cfg, err := appconfig.Load(
+		filepath.Join(*configDir, "global.yml"),
+		filepath.Join(*configDir, "crawler.yml"),
+	)
 	if err != nil {
 		panic(err)
 	}
-
-	flag.StringVar(&cfg.Crawl.StartURL, "url", cfg.Crawl.StartURL, "starting point of crawling")
-	flag.IntVar(&cfg.Crawl.MaxDepth, "max-depth", cfg.Crawl.MaxDepth, "max depth of crawling")
-	flag.BoolVar(&cfg.Debug, "debug", cfg.Debug, "debug mode")
-	flag.Parse()
-
+	if *startURL != "" {
+		cfg.Crawl.StartURL = *startURL
+	}
+	if *maxDepth > 0 {
+		cfg.Crawl.MaxDepth = *maxDepth
+	}
+	if *debug {
+		cfg.Logging.Debug = true
+	}
 	if cfg.Crawl.StartURL == "" {
 		panic("URL is mandatory. Usage: ./crawl -url https://example.com")
 	}
@@ -28,7 +41,7 @@ func main() {
 }
 
 func run(cfg appconfig.Config) {
-	logger := logging.InitLogger(cfg.Debug)
+	logger := logging.InitLogger(cfg.Logging.Debug)
 	defer logger.Sync()
 	undo := zap.ReplaceGlobals(logger)
 	defer undo()
