@@ -111,7 +111,9 @@ class SearchServer(SearchServiceServicer):
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "query is too long")
 
         page_number = request.page_number or 1
-        result_per_page = request.result_per_page or 10
+        result_per_page = request.result_per_page or (
+            5 if not request.query.strip() else 10
+        )
         if page_number < 1 or page_number > 100:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "page_number must be between 1 and 100")
         if result_per_page < 1 or result_per_page > 50:
@@ -126,11 +128,11 @@ class SearchServer(SearchServiceServicer):
                         '''SELECT id, url, title, content, description
                            FROM documents
                            WHERE url IS NOT NULL AND url <> ''
-                           ORDER BY id DESC
+                           ORDER BY random()
                            LIMIT %s OFFSET %s''',
                             (result_per_page, offset),
                         ).fetchall()
-                logging.info('Recent websites request')
+                logging.info('Random websites request')
             else:
                 search = self._model.encode(request.query)
                 logging.debug('Search vector: %d', len(search))
