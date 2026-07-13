@@ -1,0 +1,11 @@
+server:
+  address: 127.0.0.1:50052
+  token: ""
+  tls_certificate: ""
+  tls_private_key: ""
+  max_workers: 4
+  max_message_bytes: 1048576
+  reflection: false
+
+database:
+  pool_size: 8

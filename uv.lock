@@ -161,6 +161,7 @@ dependencies = [
     { name = "pandas" },
     { name = "pgvector" },
     { name = "psycopg", extra = ["pool"] },
+    { name = "pyyaml" },
     { name = "sentence-transformers" },
 ]
 
@@ -172,6 +173,7 @@ requires-dist = [
     { name = "pandas", specifier = "==2.2.3" },
     { name = "pgvector", specifier = "==0.3.6" },
     { name = "psycopg", extras = ["pool"], specifier = ">=3.2,<4" },
+    { name = "pyyaml", specifier = ">=6,<7" },
     { name = "sentence-transformers", specifier = "==3.3.1" },
 ]
 

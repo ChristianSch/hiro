@@ -1,5 +1,7 @@
+import argparse
+from pathlib import Path
+
 import logging
-import os
 import grpc
 from concurrent import futures
 from grpc_reflection.v1alpha import reflection
@@ -165,8 +167,14 @@ class SearchServer(SearchServiceServicer):
 
 
 def main() -> None:
-    settings = SearchSettings.from_env()
-    logging.basicConfig(level=os.getenv("HIRO_SEARCH_LOG_LEVEL", "INFO").upper())
+    parser = argparse.ArgumentParser(description="Run the Hiro search service")
+    parser.add_argument("--config-dir", type=Path, default=Path("config"))
+    args = parser.parse_args()
+    settings = SearchSettings.from_files(
+        args.config_dir / "global.yml",
+        args.config_dir / "search.yml",
+    )
+    logging.basicConfig(level=settings.log_level)
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=settings.max_workers),
         options=(

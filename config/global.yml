@@ -1,0 +1,10 @@
+database:
+  url: postgresql://hiro:hiro@127.0.0.1:51432/hiro
+
+model:
+  name: BAAI/bge-base-en
+  device: cpu
+
+logging:
+  level: INFO
+  debug: false

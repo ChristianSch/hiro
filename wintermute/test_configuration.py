@@ -1,59 +1,97 @@
-import os
+import tempfile
 import unittest
-from unittest.mock import patch
+from pathlib import Path
 
 from .embed.config import EmbeddingSettings
 from .search.config import SearchSettings
 
 
+GLOBAL_CONFIG = """
+database:
+  url: postgresql://hiro@localhost/hiro
+model:
+  name: shared-model
+  device: cpu
+logging:
+  level: INFO
+"""
+
+EMBED_CONFIG = """
+server:
+  address: 127.0.0.1:50052
+  token: ""
+  tls_certificate: ""
+  tls_private_key: ""
+  max_workers: 4
+  max_message_bytes: 1048576
+  reflection: false
+database:
+  pool_size: 8
+"""
+
+SEARCH_CONFIG = """
+server:
+  address: 127.0.0.1:50053
+  token: ""
+  tls_certificate: ""
+  tls_private_key: ""
+  max_workers: 4
+  max_message_bytes: 1048576
+  reflection: false
+database:
+  pool_size: 8
+"""
+
+
 class ServiceConfigurationTest(unittest.TestCase):
-    def test_embedding_configuration_has_service_defaults(self):
-        with patch.dict(
-            os.environ,
-            {"HIRO_DATABASE_URL": "postgresql://hiro@localhost/hiro"},
-            clear=True,
-        ):
-            settings = EmbeddingSettings.from_env()
+    def write_configs(self, service_name: str, service_config: str):
+        directory = tempfile.TemporaryDirectory()
+        root = Path(directory.name)
+        global_path = root / "global.yml"
+        service_path = root / f"{service_name}.yml"
+        global_path.write_text(GLOBAL_CONFIG)
+        service_path.write_text(service_config)
+        self.addCleanup(directory.cleanup)
+        return global_path, service_path
 
+    def test_embedding_configuration_merges_global_and_service_files(self):
+        paths = self.write_configs("embed", EMBED_CONFIG)
+        settings = EmbeddingSettings.from_files(*paths)
+
+        self.assertEqual("postgresql://hiro@localhost/hiro", settings.database_url)
+        self.assertEqual("shared-model", settings.model_name)
         self.assertEqual("127.0.0.1:50052", settings.listen_address)
-        self.assertEqual("cpu", settings.model_device)
 
-    def test_search_configuration_has_service_defaults(self):
-        with patch.dict(
-            os.environ,
-            {"HIRO_DATABASE_URL": "postgresql://hiro@localhost/hiro"},
-            clear=True,
-        ):
-            settings = SearchSettings.from_env()
+    def test_search_configuration_merges_global_and_service_files(self):
+        paths = self.write_configs("search", SEARCH_CONFIG)
+        settings = SearchSettings.from_files(*paths)
 
+        self.assertEqual("postgresql://hiro@localhost/hiro", settings.database_url)
+        self.assertEqual("shared-model", settings.model_name)
         self.assertEqual("127.0.0.1:50053", settings.listen_address)
-        self.assertEqual("cpu", settings.model_device)
 
-    def test_non_loopback_embedding_listener_requires_embedding_token(self):
-        with patch.dict(
-            os.environ,
-            {
-                "HIRO_DATABASE_URL": "postgresql://hiro@localhost/hiro",
-                "HIRO_EMBED_LISTEN_ADDRESS": "0.0.0.0:50052",
-            },
-            clear=True,
-        ):
-            with self.assertRaises(ValueError):
-                EmbeddingSettings.from_env()
+    def test_service_file_overrides_global_values(self):
+        global_config = GLOBAL_CONFIG + "\nserver:\n  max_workers: 2\n"
+        service_config = EMBED_CONFIG.replace("max_workers: 4", "max_workers: 6")
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+        (root / "global.yml").write_text(global_config)
+        (root / "embed.yml").write_text(service_config)
 
-    def test_non_loopback_search_listener_accepts_search_token(self):
-        with patch.dict(
-            os.environ,
-            {
-                "HIRO_DATABASE_URL": "postgresql://hiro@localhost/hiro",
-                "HIRO_SEARCH_LISTEN_ADDRESS": "0.0.0.0:50053",
-                "HIRO_SEARCH_TOKEN": "secret",
-            },
-            clear=True,
-        ):
-            settings = SearchSettings.from_env()
+        settings = EmbeddingSettings.from_files(root / "global.yml", root / "embed.yml")
 
-        self.assertEqual("secret", settings.service_token)
+        self.assertEqual(6, settings.max_workers)
+
+    def test_non_loopback_listener_requires_service_token(self):
+        service_config = EMBED_CONFIG.replace(
+            "address: 127.0.0.1:50052",
+            "address: 0.0.0.0:50052",
+        )
+        paths = self.write_configs("embed", service_config)
+
+        with self.assertRaises(ValueError):
+            EmbeddingSettings.from_files(*paths)
 
 
 if __name__ == "__main__":

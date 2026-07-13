@@ -1,10 +1,18 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..configuration import int_env, required_env, tls_paths, validate_listener
+from ..configuration import (
+    boolean,
+    load_layered_config,
+    optional_string,
+    positive_int,
+    required_string,
+    section,
+    tls_paths,
+    validate_listener,
+)
 
 
 @dataclass(frozen=True)
@@ -12,6 +20,7 @@ class SearchSettings:
     database_url: str
     model_name: str
     model_device: str
+    log_level: str
     listen_address: str
     service_token: str | None
     tls_certificate: Path | None
@@ -22,24 +31,33 @@ class SearchSettings:
     reflection_enabled: bool
 
     @classmethod
-    def from_env(cls) -> "SearchSettings":
-        listen_address = os.getenv("HIRO_SEARCH_LISTEN_ADDRESS", "127.0.0.1:50053")
-        service_token = os.getenv("HIRO_SEARCH_TOKEN") or None
+    def from_files(
+        cls,
+        global_path: Path,
+        service_path: Path,
+    ) -> "SearchSettings":
+        config = load_layered_config(global_path, service_path)
+        database = section(config, "database")
+        model = section(config, "model")
+        logging = section(config, "logging")
+        server = section(config, "server")
+
+        listen_address = required_string(server, "address")
+        service_token = optional_string(server, "token")
         validate_listener(listen_address, service_token)
-        certificate, private_key = tls_paths(
-            "HIRO_SEARCH_TLS_CERTIFICATE",
-            "HIRO_SEARCH_TLS_PRIVATE_KEY",
-        )
+        certificate, private_key = tls_paths(server)
+
         return cls(
-            database_url=required_env("HIRO_DATABASE_URL"),
-            model_name=os.getenv("HIRO_SEARCH_MODEL_NAME", "BAAI/bge-base-en"),
-            model_device=os.getenv("HIRO_SEARCH_MODEL_DEVICE", "cpu"),
+            database_url=required_string(database, "url"),
+            model_name=required_string(model, "name"),
+            model_device=required_string(model, "device"),
+            log_level=required_string(logging, "level").upper(),
             listen_address=listen_address,
             service_token=service_token,
             tls_certificate=certificate,
             tls_private_key=private_key,
-            max_workers=int_env("HIRO_SEARCH_MAX_WORKERS", 4),
-            max_message_bytes=int_env("HIRO_SEARCH_MAX_MESSAGE_BYTES", 1_048_576),
-            database_pool_size=int_env("HIRO_SEARCH_DATABASE_POOL_SIZE", 8),
-            reflection_enabled=os.getenv("HIRO_SEARCH_REFLECTION", "false").lower() == "true",
+            max_workers=positive_int(server, "max_workers"),
+            max_message_bytes=positive_int(server, "max_message_bytes"),
+            database_pool_size=positive_int(database, "pool_size"),
+            reflection_enabled=boolean(server, "reflection"),
         )

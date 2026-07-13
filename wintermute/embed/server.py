@@ -1,9 +1,11 @@
+import argparse
+from pathlib import Path
+from urllib.parse import urlsplit
+
 import grpc
 from concurrent import futures
 from grpc_reflection.v1alpha import reflection
 import logging
-import os
-from urllib.parse import urlsplit
 
 from psycopg_pool import ConnectionPool
 from pgvector.psycopg import register_vector
@@ -93,8 +95,14 @@ class EmbeddingServer(EmbeddingServiceServicer):
 
 
 def main() -> None:
-    settings = EmbeddingSettings.from_env()
-    logging.basicConfig(level=os.getenv("HIRO_EMBED_LOG_LEVEL", "INFO").upper())
+    parser = argparse.ArgumentParser(description="Run the Hiro embedding service")
+    parser.add_argument("--config-dir", type=Path, default=Path("config"))
+    args = parser.parse_args()
+    settings = EmbeddingSettings.from_files(
+        args.config_dir / "global.yml",
+        args.config_dir / "embed.yml",
+    )
+    logging.basicConfig(level=settings.log_level)
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=settings.max_workers),
         options=(
