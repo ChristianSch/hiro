@@ -13,7 +13,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0csearch.proto\x12\x06search\"L\n\rSearchRequest\x12\r\n\x05query\x18\x01 \x01(\t\x12\x13\n\x0bpage_number\x18\x02 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x03 \x01(\x05\"\x8c\x01\n\x0eSearchResponse\x12.\n\x07results\x18\x01 \x03(\x0b\x32\x1d.search.SearchResponse.Result\x1aJ\n\x06Result\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\r\n\x05title\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t2H\n\rSearchService\x12\x37\n\x06Search\x12\x15.search.SearchRequest\x1a\x16.search.SearchResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0csearch.proto\x12\x06search\"L\n\rSearchRequest\x12\r\n\x05query\x18\x01 \x01(\t\x12\x13\n\x0bpage_number\x18\x02 \x01(\x05\x12\x17\n\x0fresult_per_page\x18\x03 \x01(\x05\"\x8c\x01\n\x0eSearchResponse\x12.\n\x07results\x18\x01 \x03(\x0b\x32\x1d.search.SearchResponse.Result\x1aJ\n\x06Result\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\r\n\x05title\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\"\x0f\n\rStatusRequest\"I\n\x10\x44\x65pendencyStatus\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\'\n\x05state\x18\x02 \x01(\x0e\x32\x18.search.OperationalState\"i\n\x0eStatusResponse\x12\'\n\x05state\x18\x01 \x01(\x0e\x32\x18.search.OperationalState\x12.\n\x0c\x64\x65pendencies\x18\x02 \x03(\x0b\x32\x18.search.DependencyStatus*w\n\x10OperationalState\x12\x1d\n\x19OPERATIONAL_STATE_UNKNOWN\x10\x00\x12!\n\x1dOPERATIONAL_STATE_OPERATIONAL\x10\x01\x12!\n\x1dOPERATIONAL_STATE_UNAVAILABLE\x10\x02\x32\x81\x01\n\rSearchService\x12\x37\n\x06Search\x12\x15.search.SearchRequest\x1a\x16.search.SearchResponse\x12\x37\n\x06Status\x12\x15.search.StatusRequest\x1a\x16.search.StatusResponseB\x18Z\x16./adapters/search/grpcb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -21,12 +21,21 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'search_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
+  DESCRIPTOR._serialized_options = b'Z\026./adapters/search/grpc'
+  _globals['_OPERATIONALSTATE']._serialized_start=444
+  _globals['_OPERATIONALSTATE']._serialized_end=563
   _globals['_SEARCHREQUEST']._serialized_start=24
   _globals['_SEARCHREQUEST']._serialized_end=100
   _globals['_SEARCHRESPONSE']._serialized_start=103
   _globals['_SEARCHRESPONSE']._serialized_end=243
   _globals['_SEARCHRESPONSE_RESULT']._serialized_start=169
   _globals['_SEARCHRESPONSE_RESULT']._serialized_end=243
-  _globals['_SEARCHSERVICE']._serialized_start=245
-  _globals['_SEARCHSERVICE']._serialized_end=317
+  _globals['_STATUSREQUEST']._serialized_start=245
+  _globals['_STATUSREQUEST']._serialized_end=260
+  _globals['_DEPENDENCYSTATUS']._serialized_start=262
+  _globals['_DEPENDENCYSTATUS']._serialized_end=335
+  _globals['_STATUSRESPONSE']._serialized_start=337
+  _globals['_STATUSRESPONSE']._serialized_end=442
+  _globals['_SEARCHSERVICE']._serialized_start=566
+  _globals['_SEARCHSERVICE']._serialized_end=695
 # @@protoc_insertion_point(module_scope)

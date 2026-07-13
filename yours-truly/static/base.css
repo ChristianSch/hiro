@@ -64,6 +64,81 @@
     }
 }
 
+.footer-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.footer-copyright {
+    justify-self: start;
+}
+
+.footer-status {
+    justify-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: oklch(0.48 0.01 250);
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.footer-status-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    flex: none;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.footer-status--operational {
+    color: oklch(0.48 0.13 154);
+}
+
+.footer-status--unavailable {
+    color: oklch(0.5 0.19 25);
+}
+
+.dark .footer-status--checking {
+    color: oklch(0.72 0.01 250);
+}
+
+.dark .footer-status--operational {
+    color: oklch(0.76 0.14 154);
+}
+
+.dark .footer-status--unavailable {
+    color: oklch(0.74 0.16 25);
+}
+
+.footer-credit {
+    justify-self: end;
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+@media (max-width: 639px) {
+    .footer-content {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+        text-align: center;
+    }
+
+    .footer-copyright,
+    .footer-credit,
+    .footer-status {
+        justify-self: center;
+    }
+
+    .footer-status {
+        grid-row: 1;
+    }
+}
+
 body {
     font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
     background-color: #f8f8f8;

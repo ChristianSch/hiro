@@ -26,16 +26,28 @@
     </main>
   </div>
 
-  <footer class=" mt-auto p-6">
+  <footer class="mt-auto p-6">
     <hr class="my-6 border-gray-200 sm:mx-auto dark:border-gray-700 lg:my-8" />
-      <div class="sm:flex sm:items-center sm:justify-between">
-          <span class="text-sm text-gray-500 sm:text-center dark:text-gray-400">© 2023 <a href="#" class="hover:underline">Hiro</a>. All Rights Reserved.</span>
+    <div class="footer-content">
+      <span class="footer-copyright text-sm text-gray-500 dark:text-gray-400">© 2023 <a href="#" class="hover:underline">Hiro</a>. All Rights Reserved.</span>
 
-          <div class="flex mt-4 space-x-5 sm:justify-center sm:mt-0 text-sm">
-            <span>Brought to you by: </span>
-              <a href="https://christianschulze.io" class="text-gray-500 hover:text-gray-900 dark:hover:text-white">Christian Schulze</a>
-          </div>
+      <span id="search-status"
+            class="footer-status footer-status--checking"
+            hx-get="/htmx/status"
+            hx-trigger="load"
+            hx-swap="outerHTML"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true">
+        <span class="footer-status-dot" aria-hidden="true"></span>
+        <span>Checking search…</span>
+      </span>
+
+      <div class="footer-credit text-sm">
+        <span>Brought to you by:</span>
+        <a href="https://christianschulze.io" class="text-gray-500 hover:text-gray-900 dark:hover:text-white">Christian Schulze</a>
       </div>
-    </footer>
+    </div>
+  </footer>
   </body>
 </html>

@@ -28,6 +28,11 @@ type SearchResult struct {
 	Description string
 }
 
+type ServiceStatus struct {
+	Operational  bool
+	Dependencies map[string]bool
+}
+
 func NewGrpcSearcher(cfg GrpcSearcherConfig) *GrpcSearcher {
 	conn, err := grpc.Dial(cfg.Host, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -43,6 +48,23 @@ func NewGrpcSearcher(cfg GrpcSearcherConfig) *GrpcSearcher {
 		cfg:    cfg,
 		client: c,
 	}
+}
+
+func (s *GrpcSearcher) Status(ctx context.Context) (*ServiceStatus, error) {
+	response, err := s.client.Status(ctx, &pb.StatusRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	status := &ServiceStatus{
+		Operational:  response.State == pb.OperationalState_OPERATIONAL_STATE_OPERATIONAL,
+		Dependencies: make(map[string]bool, len(response.Dependencies)),
+	}
+	for _, dependency := range response.Dependencies {
+		status.Dependencies[dependency.Name] = dependency.State == pb.OperationalState_OPERATIONAL_STATE_OPERATIONAL
+	}
+
+	return status, nil
 }
 
 func (s *GrpcSearcher) Search(query string) ([]*SearchResult, error) {

@@ -1,0 +1,11 @@
+<span id="search-status"
+      class="footer-status {{if .operational}}footer-status--operational{{else}}footer-status--unavailable{{end}}"
+      hx-get="/htmx/status"
+      hx-trigger="every 10s"
+      hx-swap="outerHTML"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true">
+    <span class="footer-status-dot" aria-hidden="true"></span>
+    <span>{{if .operational}}Search operational{{else}}Search unavailable{{end}}</span>
+</span>

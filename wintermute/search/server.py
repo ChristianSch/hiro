@@ -8,7 +8,16 @@ from pgvector.psycopg import register_vector
 from sentence_transformers import SentenceTransformer
 
 from .stubs.search_pb2_grpc import SearchServiceServicer, add_SearchServiceServicer_to_server
-from .stubs.search_pb2 import SearchRequest, SearchResponse, DESCRIPTOR
+from .stubs.search_pb2 import (
+    DependencyStatus,
+    DESCRIPTOR,
+    OPERATIONAL_STATE_OPERATIONAL,
+    OPERATIONAL_STATE_UNAVAILABLE,
+    SearchRequest,
+    SearchResponse,
+    StatusRequest,
+    StatusResponse,
+)
 
 
 class SearchServer(SearchServiceServicer):
@@ -23,7 +32,9 @@ class SearchServer(SearchServiceServicer):
 
     def _init_db(self):
         conn = psycopg.connect(
-            "dbname=hiro user=hiro password=hiro host=localhost port=51432")
+            "dbname=hiro user=hiro password=hiro host=localhost port=51432",
+            autocommit=True,
+        )
         register_vector(conn)
         self._conn = conn
         logging.info('Database connection established.')
@@ -32,6 +43,36 @@ class SearchServer(SearchServiceServicer):
         if self._conn is not None and self._conn.closed == 0:
             self._conn.close()
             logging.info('Database connection closed.')
+
+    def Status(self, request: StatusRequest, context):
+        database_state = OPERATIONAL_STATE_UNAVAILABLE
+
+        try:
+            with self._conn.cursor() as cur:
+                result = cur.execute('SELECT 1').fetchone()
+            if result == (1,):
+                database_state = OPERATIONAL_STATE_OPERATIONAL
+        except Exception:
+            logging.warning('PostgreSQL readiness check failed', exc_info=1)
+
+        model_is_ready = self._model is not None
+        is_operational = (
+            model_is_ready
+            and database_state == OPERATIONAL_STATE_OPERATIONAL
+        )
+
+        context.set_code(grpc.StatusCode.OK)
+        return StatusResponse(
+            state=(
+                OPERATIONAL_STATE_OPERATIONAL
+                if is_operational
+                else OPERATIONAL_STATE_UNAVAILABLE
+            ),
+            dependencies=[DependencyStatus(
+                name='postgresql',
+                state=database_state,
+            )],
+        )
 
     def Search(self, request: SearchRequest, context):
         try:

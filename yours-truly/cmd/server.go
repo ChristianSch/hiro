@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/ChristianSch/hiro/yours-truly/adapters/search"
 	"github.com/ChristianSch/hiro/yours-truly/infra/logging"
@@ -40,6 +42,22 @@ func main() {
 	})
 
 	htmx := app.Group("/htmx")
+	htmx.Get("/status", func(ctx *fiber.Ctx) error {
+		statusCtx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+		defer cancel()
+
+		status, err := searcher.Status(statusCtx)
+		operational := err == nil && status.Operational
+		if err != nil {
+			zap.L().Warn("search status check failed", zap.Error(err))
+		}
+
+		ctx.Set(fiber.HeaderCacheControl, "no-store")
+		return ctx.Render("status", fiber.Map{
+			"operational": operational,
+		}, "layouts/empty")
+	})
+
 	htmx.Get("/random", func(ctx *fiber.Ctx) error {
 		res, err := searcher.Search("")
 		if err != nil {

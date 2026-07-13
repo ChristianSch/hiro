@@ -20,6 +20,25 @@ message SearchResponse {
   repeated Result results = 1;
 }
 
+enum OperationalState {
+  OPERATIONAL_STATE_UNKNOWN = 0;
+  OPERATIONAL_STATE_OPERATIONAL = 1;
+  OPERATIONAL_STATE_UNAVAILABLE = 2;
+}
+
+message StatusRequest {}
+
+message DependencyStatus {
+  string name = 1;
+  OperationalState state = 2;
+}
+
+message StatusResponse {
+  OperationalState state = 1;
+  repeated DependencyStatus dependencies = 2;
+}
+
 service SearchService {
   rpc Search(SearchRequest) returns (SearchResponse);
+  rpc Status(StatusRequest) returns (StatusResponse);
 }
