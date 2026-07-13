@@ -40,6 +40,18 @@ func main() {
 	})
 
 	htmx := app.Group("/htmx")
+	htmx.Get("/random", func(ctx *fiber.Ctx) error {
+		res, err := searcher.Search("")
+		if err != nil {
+			zap.L().Error("loading random websites failed", zap.Error(err))
+			return err
+		}
+
+		return ctx.Render("results", fiber.Map{
+			"results": res,
+		}, "layouts/empty")
+	})
+
 	htmx.Get("/search", func(ctx *fiber.Ctx) error {
 		query := ctx.Query("q")
 		logger.Info("search", zap.String("query", query))

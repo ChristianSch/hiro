@@ -2,11 +2,17 @@
     <div class="mx-auto w-lg text-center">
         <a href="/"><h1 class="logo">Hiro</h1></a>
         <div class="p-8 max-w-xl mx-auto">
-            <input hx-get="/htmx/search" hx-target="#search-container" hx-swap="outerHTML" type="text" name="q" id="search" class="w-full p-2 border border-gray-300 rounded shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Search..." value="{{ .query }}"/>
+            <div id="search-field" class="search-field">
+                <input hx-get="/htmx/search" hx-target="#search-container" hx-swap="outerHTML" hx-indicator="#search-field" type="text" name="q" id="search" class="search-input w-full p-2 pr-10 border border-gray-300 rounded shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Search..." value="{{ .query }}"/>
+                <div id="search-loading" class="search-loading" role="status" aria-live="polite">
+                    <span class="search-loading-spinner" aria-hidden="true"></span>
+                    <span class="sr-only">Searching</span>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div id="search-results" class="">
+    <div id="search-results" class=""{{ if not .query }} hx-get="/htmx/random" hx-trigger="load" hx-swap="innerHTML" hx-indicator="#search-field"{{ end }}>
     {{if .results }}
         <div class="text-gray-400">
             Found {{ len .results }} results for <span>"{{ .query }}"</span>

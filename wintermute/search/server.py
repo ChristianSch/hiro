@@ -35,14 +35,25 @@ class SearchServer(SearchServiceServicer):
 
     def Search(self, request: SearchRequest, context):
         try:
-            search = self._model.encode(request.query)
-            logging.debug('Search vector: %d', len(search))
+            if not request.query.strip():
+                with self._conn.cursor() as cur:
+                    res = cur.execute(
+                        '''SELECT id, url, title, content, description
+                           FROM documents
+                           WHERE url IS NOT NULL AND url <> ''
+                           ORDER BY random()
+                           LIMIT 5''',
+                    ).fetchall()
+                logging.info('Random websites request')
+            else:
+                search = self._model.encode(request.query)
+                logging.debug('Search vector: %d', len(search))
 
-            with self._conn.cursor() as cur:
-                res = cur.execute(
-                    'SELECT * FROM match_documents(%s, %s, 0.78, 10)',
-                    (search, request.query),
-                ).fetchall()
+                with self._conn.cursor() as cur:
+                    res = cur.execute(
+                        'SELECT * FROM match_documents(%s, %s, 0.78, 10)',
+                        (search, request.query),
+                    ).fetchall()
 
             context.set_code(grpc.StatusCode.OK)
 
