@@ -2,22 +2,31 @@ package search
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/url"
+	"time"
 
 	pb "github.com/ChristianSch/hiro/yours-truly/adapters/search/grpc"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 type GrpcSearcher struct {
 	cfg    GrpcSearcherConfig
+	conn   *grpc.ClientConn
 	client pb.SearchServiceClient
 }
 
 type GrpcSearcherConfig struct {
-	Host string
+	Host       string
+	Token      string
+	Timeout    time.Duration
+	Insecure   bool
+	ServerName string
 }
 
 type SearchResult struct {
@@ -33,25 +42,53 @@ type ServiceStatus struct {
 	Dependencies map[string]bool
 }
 
-func NewGrpcSearcher(cfg GrpcSearcherConfig) *GrpcSearcher {
-	conn, err := grpc.Dial(cfg.Host, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		panic(err)
+func NewGrpcSearcher(cfg GrpcSearcherConfig) (*GrpcSearcher, error) {
+	if cfg.Timeout <= 0 {
+		cfg.Timeout = 5 * time.Second
 	}
-	// defer conn.Close()
 
-	c := pb.NewSearchServiceClient(conn)
+	var transport credentials.TransportCredentials
+	if cfg.Insecure {
+		transport = insecure.NewCredentials()
+	} else {
+		transport = credentials.NewTLS(&tls.Config{
+			MinVersion: tls.VersionTLS12,
+			ServerName: cfg.ServerName,
+		})
+	}
+
+	conn, err := grpc.Dial(cfg.Host, grpc.WithTransportCredentials(transport))
+	if err != nil {
+		return nil, fmt.Errorf("connect to search service: %w", err)
+	}
 
 	zap.L().Info("grpc searcher initialized", zap.String("host", cfg.Host))
-
 	return &GrpcSearcher{
 		cfg:    cfg,
-		client: c,
+		conn:   conn,
+		client: pb.NewSearchServiceClient(conn),
+	}, nil
+}
+
+func (s *GrpcSearcher) Close() error {
+	if s.conn == nil {
+		return nil
 	}
+	return s.conn.Close()
+}
+
+func (s *GrpcSearcher) requestContext(parent context.Context) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithTimeout(parent, s.cfg.Timeout)
+	if s.cfg.Token != "" {
+		ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+s.cfg.Token)
+	}
+	return ctx, cancel
 }
 
 func (s *GrpcSearcher) Status(ctx context.Context) (*ServiceStatus, error) {
-	response, err := s.client.Status(ctx, &pb.StatusRequest{})
+	requestCtx, cancel := s.requestContext(ctx)
+	defer cancel()
+	response, err := s.client.Status(requestCtx, &pb.StatusRequest{})
 	if err != nil {
 		return nil, err
 	}
@@ -67,9 +104,11 @@ func (s *GrpcSearcher) Status(ctx context.Context) (*ServiceStatus, error) {
 	return status, nil
 }
 
-func (s *GrpcSearcher) Search(query string) ([]*SearchResult, error) {
-	zap.L().Info("searching via grpc", zap.String("query", query))
-	r, err := s.client.Search(context.Background(), &pb.SearchRequest{Query: query})
+func (s *GrpcSearcher) Search(ctx context.Context, query string) ([]*SearchResult, error) {
+	requestCtx, cancel := s.requestContext(ctx)
+	defer cancel()
+	zap.L().Info("searching via grpc")
+	r, err := s.client.Search(requestCtx, &pb.SearchRequest{Query: query})
 	if err != nil {
 		return nil, err
 	}
@@ -78,19 +117,20 @@ func (s *GrpcSearcher) Search(query string) ([]*SearchResult, error) {
 	for i, res := range r.Results {
 		var host string
 		// parse url and get host
+		var page string
 		u, err := url.Parse(res.Url)
 		if err != nil {
-			zap.L().Error("failed to parse url", zap.Error(err), zap.String("url", res.Url))
-			host = ""
+			zap.L().Warn("failed to parse search result URL", zap.Error(err))
 		} else {
 			host = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+			page = u.Path
 		}
 
 		out[i] = &SearchResult{
 			Title:       res.Title,
 			Url:         res.Url,
 			Host:        host,
-			Page:        u.Path,
+			Page:        page,
 			Description: res.Description,
 		}
 	}

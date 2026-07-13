@@ -3,7 +3,8 @@
         <a href="/"><h1 class="logo">Hiro</h1></a>
         <div class="p-8 max-w-xl mx-auto">
             <div id="search-field" class="search-field">
-                <input hx-get="/htmx/search" hx-target="#search-container" hx-swap="outerHTML" hx-indicator="#search-field" type="text" name="q" id="search" class="search-input w-full p-2 pr-10 border border-gray-300 rounded shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Search..." value="{{ .query }}"/>
+                <label for="search" class="sr-only">Search indexed websites</label>
+                <input hx-get="/htmx/search" hx-target="#search-container" hx-swap="outerHTML" hx-indicator="#search-field" type="search" name="q" id="search" maxlength="512" autocomplete="off" class="search-input w-full p-2 pr-10 border border-gray-300 rounded shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Search..." value="{{ .query }}"/>
                 <div id="search-loading" class="search-loading" role="status" aria-live="polite">
                     <span class="search-loading-spinner" aria-hidden="true"></span>
                     <span class="sr-only">Searching</span>
@@ -39,15 +40,4 @@
         {{end}}
     {{end}}
     </div>
-    <script lang="text/javascript">
-        var results = document.getElementsByClassName("search-result-descr");
-        var terms = {{ .query }}.split(" ");
-
-        for (var j = 0; j < results.length; j++) {
-            for (var i = 0; i < terms.length; i++) {
-                var term = terms[i];
-                results[j].innerHTML = results[j].innerHTML.replace(new RegExp(term, "gi"), (match) => `<mark>${match}</mark>`);
-            }
-        }
-    </script>
 </div>
