@@ -162,9 +162,7 @@ uv run python eval/run_eval.py --queries eval/queries.json --json-output eval/re
 
 ### Current caveats
 
-- Search pagination fields exist in `proto/search.proto`, but the current search service always requests 10 matches.
-- The SentenceTransformer device is hardcoded to `mps`, which is appropriate for Apple Silicon. Use `cpu` or `cuda` if running elsewhere.
-- Local service hosts and the Postgres DSN are currently hardcoded for development.
+- The search API supports pagination, but the current web UI does not expose paging controls.
 
 ## Components
 
@@ -196,6 +194,7 @@ If you do not have uv installed, see https://docs.astral.sh/uv/getting-started/i
 Run Wintermute's embedding and search services in separate terminals:
 
 ```bash
+export HIRO_DATABASE_URL=postgresql://hiro:hiro@127.0.0.1:51432/hiro
 uv run python -m wintermute.embed.server
 uv run python -m wintermute.search.server
 ```
@@ -219,6 +218,19 @@ Then open:
 ```text
 http://localhost:8973
 ```
+
+### Service configuration
+
+Configuration is owned by each service rather than a shared application-wide object:
+
+- `wintermute/embed/config.py` reads `HIRO_EMBED_*` settings.
+- `wintermute/search/config.py` reads `HIRO_SEARCH_*` settings.
+- Protagonist uses Viper and govalidator. It reads an optional `crawler.yml` or the `HIRO_CRAWLER_*` namespace. See `protagonist/crawler.example.yml`.
+- Yours-Truly uses Viper and govalidator. It reads an optional `web.yml` or the `HIRO_WEB_*` namespace. See `yours-truly/web.example.yml`.
+
+Both Python services share only the required `HIRO_DATABASE_URL`, because they connect to the same database. All other settings have local-development defaults. Tokens, TLS, model selection, listener addresses, timeouts, and limits are service-specific and only need to be configured when overriding those defaults.
+
+Set `HIRO_CRAWLER_CONFIG` or `HIRO_WEB_CONFIG` to load a configuration file from a non-default path. Nested Viper keys map to environment variables with underscores; for example, `embedding.address` maps to `HIRO_CRAWLER_EMBEDDING_ADDRESS`.
 
 ### Database setup
 

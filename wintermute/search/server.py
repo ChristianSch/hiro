@@ -21,7 +21,7 @@ from .stubs.search_pb2 import (
     StatusRequest,
     StatusResponse,
 )
-from ..config import ServiceSettings
+from .config import SearchSettings
 from ..grpc_utils import add_server_port, require_authorization
 
 
@@ -33,7 +33,7 @@ class SearchServer(SearchServiceServicer):
     _model = None
     _pool = None
 
-    def __init__(self, settings: ServiceSettings) -> None:
+    def __init__(self, settings: SearchSettings) -> None:
         super().__init__()
         self._settings = settings
         self._model = SentenceTransformer(
@@ -44,7 +44,7 @@ class SearchServer(SearchServiceServicer):
 
     def _init_db(self):
         self._pool = ConnectionPool(
-            conninfo=self._settings.database_dsn,
+            conninfo=self._settings.database_url,
             min_size=1,
             max_size=self._settings.database_pool_size,
             kwargs={"autocommit": True},
@@ -165,8 +165,8 @@ class SearchServer(SearchServiceServicer):
 
 
 def main() -> None:
-    settings = ServiceSettings.from_env(default_port=50053)
-    logging.basicConfig(level=os.getenv("HIRO_LOG_LEVEL", "INFO").upper())
+    settings = SearchSettings.from_env()
+    logging.basicConfig(level=os.getenv("HIRO_SEARCH_LOG_LEVEL", "INFO").upper())
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=settings.max_workers),
         options=(
@@ -177,7 +177,7 @@ def main() -> None:
     service = SearchServer(settings)
     add_SearchServiceServicer_to_server(service, server)
 
-    if os.getenv("HIRO_ENABLE_REFLECTION", "false").lower() == "true":
+    if settings.reflection_enabled:
         service_names = (
             DESCRIPTOR.services_by_name["SearchService"].full_name,
             reflection.SERVICE_NAME,
@@ -186,13 +186,15 @@ def main() -> None:
 
     if add_server_port(
         server,
-        settings.address,
+        settings.listen_address,
         settings.tls_certificate,
         settings.tls_private_key,
     ) == 0:
-        raise RuntimeError(f"failed to bind search service to {settings.address}")
+        raise RuntimeError(
+            f"failed to bind search service to {settings.listen_address}"
+        )
 
-    logging.info("Starting search server on %s", settings.address)
+    logging.info("Starting search server on %s", settings.listen_address)
     server.start()
     try:
         server.wait_for_termination()

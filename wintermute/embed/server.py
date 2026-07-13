@@ -11,7 +11,7 @@ from sentence_transformers import SentenceTransformer
 
 from .stubs.embedding_pb2_grpc import EmbeddingServiceServicer, add_EmbeddingServiceServicer_to_server
 from .stubs.embedding_pb2 import EmbeddingRequest, EmbeddingResponse, DESCRIPTOR
-from ..config import ServiceSettings
+from .config import EmbeddingSettings
 from ..grpc_utils import add_server_port, require_authorization
 
 
@@ -24,7 +24,7 @@ class EmbeddingServer(EmbeddingServiceServicer):
     _model = None
     _pool = None
 
-    def __init__(self, settings: ServiceSettings) -> None:
+    def __init__(self, settings: EmbeddingSettings) -> None:
         super().__init__()
         self._settings = settings
         self._model = SentenceTransformer(
@@ -35,7 +35,7 @@ class EmbeddingServer(EmbeddingServiceServicer):
 
     def _init_db(self):
         self._pool = ConnectionPool(
-            conninfo=self._settings.database_dsn,
+            conninfo=self._settings.database_url,
             min_size=1,
             max_size=self._settings.database_pool_size,
             configure=_configure_connection,
@@ -93,8 +93,8 @@ class EmbeddingServer(EmbeddingServiceServicer):
 
 
 def main() -> None:
-    settings = ServiceSettings.from_env(default_port=50052)
-    logging.basicConfig(level=os.getenv("HIRO_LOG_LEVEL", "INFO").upper())
+    settings = EmbeddingSettings.from_env()
+    logging.basicConfig(level=os.getenv("HIRO_EMBED_LOG_LEVEL", "INFO").upper())
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=settings.max_workers),
         options=(
@@ -105,7 +105,7 @@ def main() -> None:
     service = EmbeddingServer(settings)
     add_EmbeddingServiceServicer_to_server(service, server)
 
-    if os.getenv("HIRO_ENABLE_REFLECTION", "false").lower() == "true":
+    if settings.reflection_enabled:
         service_names = (
             DESCRIPTOR.services_by_name["EmbeddingService"].full_name,
             reflection.SERVICE_NAME,
@@ -114,13 +114,15 @@ def main() -> None:
 
     if add_server_port(
         server,
-        settings.address,
+        settings.listen_address,
         settings.tls_certificate,
         settings.tls_private_key,
     ) == 0:
-        raise RuntimeError(f"failed to bind embedding service to {settings.address}")
+        raise RuntimeError(
+            f"failed to bind embedding service to {settings.listen_address}"
+        )
 
-    logging.info("Starting embedding server on %s", settings.address)
+    logging.info("Starting embedding server on %s", settings.listen_address)
     server.start()
     try:
         server.wait_for_termination()
