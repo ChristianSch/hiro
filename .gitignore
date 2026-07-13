@@ -3,6 +3,7 @@
 
 .venv/
 .vscode/
+.pi
 
 .DS_Store
 __pycache__/
