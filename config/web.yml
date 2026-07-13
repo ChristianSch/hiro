@@ -8,5 +8,7 @@ http:
 
 search:
   address: 127.0.0.1:50053
+  token: ""
   timeout: 5s
   insecure: true
+  server_name: ""

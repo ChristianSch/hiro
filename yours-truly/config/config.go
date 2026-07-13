@@ -1,15 +1,16 @@
 package config
 
 import (
-	"errors"
 	"fmt"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/spf13/viper"
 )
+
+type Logging struct {
+	Debug bool `mapstructure:"debug" valid:"-"`
+}
 
 type HTTP struct {
 	Address      string        `mapstructure:"address" valid:"required"`
@@ -29,52 +30,21 @@ type Search struct {
 }
 
 type Config struct {
-	Debug  bool   `mapstructure:"debug" valid:"-"`
-	HTTP   HTTP   `mapstructure:"http" valid:"-"`
-	Search Search `mapstructure:"search" valid:"-"`
+	Logging Logging `mapstructure:"logging" valid:"-"`
+	HTTP    HTTP    `mapstructure:"http" valid:"-"`
+	Search  Search  `mapstructure:"search" valid:"-"`
 }
 
-func Load() (Config, error) {
+func Load(globalPath, servicePath string) (Config, error) {
 	loader := viper.New()
-	loader.SetConfigName("web")
-	loader.SetConfigType("yaml")
-	loader.AddConfigPath(".")
-	loader.SetEnvPrefix("HIRO_WEB")
-	loader.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	loader.AutomaticEnv()
-	loader.SetTypeByDefaultValue(true)
-
-	defaults := map[string]any{
-		"debug":                  false,
-		"http.address":           "127.0.0.1:8973",
-		"http.read_timeout":      10 * time.Second,
-		"http.write_timeout":     15 * time.Second,
-		"http.idle_timeout":      60 * time.Second,
-		"http.body_limit":        64 * 1024,
-		"http.search_rate_limit": 60,
-		"search.address":         "127.0.0.1:50053",
-		"search.token":           "",
-		"search.timeout":         5 * time.Second,
-		"search.insecure":        true,
-		"search.server_name":     "",
-	}
-	for key, value := range defaults {
-		loader.SetDefault(key, value)
-		if err := loader.BindEnv(key); err != nil {
-			return Config{}, fmt.Errorf("bind %s: %w", key, err)
-		}
+	loader.SetConfigFile(globalPath)
+	if err := loader.ReadInConfig(); err != nil {
+		return Config{}, fmt.Errorf("read global config: %w", err)
 	}
 
-	if path := os.Getenv("HIRO_WEB_CONFIG"); path != "" {
-		loader.SetConfigFile(path)
-		if err := loader.ReadInConfig(); err != nil {
-			return Config{}, fmt.Errorf("read web config: %w", err)
-		}
-	} else if err := loader.ReadInConfig(); err != nil {
-		var notFound viper.ConfigFileNotFoundError
-		if !errors.As(err, &notFound) {
-			return Config{}, fmt.Errorf("read web config: %w", err)
-		}
+	loader.SetConfigFile(servicePath)
+	if err := loader.MergeInConfig(); err != nil {
+		return Config{}, fmt.Errorf("read web config: %w", err)
 	}
 
 	var cfg Config

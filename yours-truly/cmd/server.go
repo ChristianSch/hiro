@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -25,12 +27,17 @@ import (
 const maxQueryBytes = 512
 
 func main() {
-	cfg, err := appconfig.Load()
+	configDir := flag.String("config-dir", "../config", "directory containing global.yml and web.yml")
+	flag.Parse()
+	cfg, err := appconfig.Load(
+		filepath.Join(*configDir, "global.yml"),
+		filepath.Join(*configDir, "web.yml"),
+	)
 	if err != nil {
 		panic(err)
 	}
 
-	logger := logging.InitLogger(cfg.Debug)
+	logger := logging.InitLogger(cfg.Logging.Debug)
 	defer logger.Sync()
 	undo := zap.ReplaceGlobals(logger)
 	defer undo()
