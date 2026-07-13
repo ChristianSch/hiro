@@ -4,6 +4,9 @@
 .venv/
 .vscode/
 .pi
+.env
+.env.*
+!.env.example
 
 .DS_Store
 __pycache__/

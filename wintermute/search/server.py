@@ -1,9 +1,12 @@
 import logging
+import os
 import grpc
 from concurrent import futures
 from grpc_reflection.v1alpha import reflection
 
-import psycopg
+from contextlib import contextmanager
+
+from psycopg_pool import ConnectionPool
 from pgvector.psycopg import register_vector
 from sentence_transformers import SentenceTransformer
 
@@ -18,38 +21,64 @@ from .stubs.search_pb2 import (
     StatusRequest,
     StatusResponse,
 )
+from ..config import ServiceSettings
+from ..grpc_utils import add_server_port, require_authorization
+
+
+def _configure_connection(connection) -> None:
+    register_vector(connection)
 
 
 class SearchServer(SearchServiceServicer):
     _model = None
-    _conn = None
+    _pool = None
 
-    def __init__(self) -> None:
+    def __init__(self, settings: ServiceSettings) -> None:
         super().__init__()
-
-        self._model = SentenceTransformer('BAAI/bge-base-en', device='mps')
+        self._settings = settings
+        self._model = SentenceTransformer(
+            settings.model_name,
+            device=settings.model_device,
+        )
         self._init_db()
 
     def _init_db(self):
-        conn = psycopg.connect(
-            "dbname=hiro user=hiro password=hiro host=localhost port=51432",
-            autocommit=True,
+        self._pool = ConnectionPool(
+            conninfo=self._settings.database_dsn,
+            min_size=1,
+            max_size=self._settings.database_pool_size,
+            kwargs={"autocommit": True},
+            configure=_configure_connection,
+            open=True,
         )
-        register_vector(conn)
-        self._conn = conn
-        logging.info('Database connection established.')
+        self._pool.wait(timeout=10)
+        logging.info('Database connection pool established.')
 
-    def __del__(self):
-        if self._conn is not None and self._conn.closed == 0:
-            self._conn.close()
-            logging.info('Database connection closed.')
+    @contextmanager
+    def _connection(self):
+        if self._pool is not None:
+            with self._pool.connection() as connection:
+                yield connection
+            return
+        # Compatibility path for lightweight unit-test fakes.
+        yield self._conn
+
+    def close(self) -> None:
+        if self._pool is not None:
+            self._pool.close()
+            logging.info('Database connection pool closed.')
 
     def Status(self, request: StatusRequest, context):
+        require_authorization(
+            context,
+            getattr(getattr(self, "_settings", None), "service_token", None),
+        )
         database_state = OPERATIONAL_STATE_UNAVAILABLE
 
         try:
-            with self._conn.cursor() as cur:
-                result = cur.execute('SELECT 1').fetchone()
+            with self._connection() as connection:
+                with connection.cursor() as cur:
+                    result = cur.execute('SELECT 1').fetchone()
             if result == (1,):
                 database_state = OPERATIONAL_STATE_OPERATIONAL
         except Exception:
@@ -75,32 +104,46 @@ class SearchServer(SearchServiceServicer):
         )
 
     def Search(self, request: SearchRequest, context):
+        require_authorization(context, self._settings.service_token)
+        if len(request.query) > 512:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "query is too long")
+
+        page_number = request.page_number or 1
+        result_per_page = request.result_per_page or 10
+        if page_number < 1 or page_number > 100:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "page_number must be between 1 and 100")
+        if result_per_page < 1 or result_per_page > 50:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "result_per_page must be between 1 and 50")
+        offset = (page_number - 1) * result_per_page
+
         try:
             if not request.query.strip():
-                with self._conn.cursor() as cur:
-                    res = cur.execute(
+                with self._connection() as connection:
+                    with connection.cursor() as cur:
+                        res = cur.execute(
                         '''SELECT id, url, title, content, description
                            FROM documents
                            WHERE url IS NOT NULL AND url <> ''
-                           ORDER BY random()
-                           LIMIT 5''',
-                    ).fetchall()
-                logging.info('Random websites request')
+                           ORDER BY id DESC
+                           LIMIT %s OFFSET %s''',
+                            (result_per_page, offset),
+                        ).fetchall()
+                logging.info('Recent websites request')
             else:
                 search = self._model.encode(request.query)
                 logging.debug('Search vector: %d', len(search))
 
-                with self._conn.cursor() as cur:
-                    res = cur.execute(
-                        'SELECT * FROM match_documents(%s, %s, 0.78, 10)',
-                        (search, request.query),
-                    ).fetchall()
+                with self._connection() as connection:
+                    with connection.cursor() as cur:
+                        res = cur.execute(
+                            'SELECT * FROM match_documents(%s, %s, 0.78, %s) OFFSET %s',
+                            (search, request.query, result_per_page + offset, offset),
+                        ).fetchall()
 
             context.set_code(grpc.StatusCode.OK)
 
-            logging.info('Search request: %s', request.query)
+            logging.info('Search request completed')
             logging.debug('Search results: %d', len(res))
-            logging.debug(res)
 
             # the db responds with the following in the respective order:
             # 1. document id
@@ -112,31 +155,53 @@ class SearchServer(SearchServiceServicer):
             return SearchResponse(results=[SearchResponse.Result(
                 url=r[1],
                 title=r[2],
-                content=r[3],
+                content='',
                 description=r[4],
             ) for r in res])
 
-        except Exception as e:
-            logging.error('Search request failed: %s', request.query)
-            logging.error(e, exc_info=1)
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(str(e))
-            return SearchResponse()
+        except Exception:
+            logging.exception('Search request failed')
+            context.abort(grpc.StatusCode.INTERNAL, 'search request failed')
 
 
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    add_SearchServiceServicer_to_server(SearchServer(), server)
-
-    SERVICE_NAMES = (
-        DESCRIPTOR.services_by_name['SearchService'].full_name,
-        reflection.SERVICE_NAME,
+def main() -> None:
+    settings = ServiceSettings.from_env(default_port=50053)
+    logging.basicConfig(level=os.getenv("HIRO_LOG_LEVEL", "INFO").upper())
+    server = grpc.server(
+        futures.ThreadPoolExecutor(max_workers=settings.max_workers),
+        options=(
+            ("grpc.max_receive_message_length", settings.max_message_bytes),
+            ("grpc.max_send_message_length", settings.max_message_bytes),
+        ),
     )
+    service = SearchServer(settings)
+    add_SearchServiceServicer_to_server(service, server)
 
-    reflection.enable_server_reflection(SERVICE_NAMES, server)
+    if os.getenv("HIRO_ENABLE_REFLECTION", "false").lower() == "true":
+        service_names = (
+            DESCRIPTOR.services_by_name["SearchService"].full_name,
+            reflection.SERVICE_NAME,
+        )
+        reflection.enable_server_reflection(service_names, server)
 
-    logging.info('Starting server. Listening on port 50053.')
-    server.add_insecure_port('[::]:50053')
+    if add_server_port(
+        server,
+        settings.address,
+        settings.tls_certificate,
+        settings.tls_private_key,
+    ) == 0:
+        raise RuntimeError(f"failed to bind search service to {settings.address}")
+
+    logging.info("Starting search server on %s", settings.address)
     server.start()
-    server.wait_for_termination()
+    try:
+        server.wait_for_termination()
+    except KeyboardInterrupt:
+        logging.info("Stopping search server")
+        server.stop(grace=10).wait()
+    finally:
+        service.close()
+
+
+if __name__ == "__main__":
+    main()
