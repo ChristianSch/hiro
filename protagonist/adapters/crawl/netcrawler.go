@@ -1,7 +1,11 @@
 package crawl
 
 import (
+	"fmt"
+	"io"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/ChristianSch/hiro/protagonist/domain/model/crawl"
 
@@ -9,22 +13,31 @@ import (
 )
 
 type NetCrawler struct {
+	client *http.Client
 }
 
 func NewNetCrawler() *NetCrawler {
-	return &NetCrawler{}
+	return &NetCrawler{client: &http.Client{
+		Timeout:   15 * time.Second,
+		Transport: safeTransport(false),
+	}}
 }
 
 func (c *NetCrawler) Crawl(url string) (*crawl.CrawlResult, error) {
-	res, err := http.Get(url)
+	res, err := c.client.Get(url)
 	if err != nil {
 		return nil, err
 	}
 
 	defer res.Body.Close()
+	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("unexpected HTTP status %d", res.StatusCode)
+	}
+	if !strings.HasPrefix(strings.ToLower(res.Header.Get("Content-Type")), "text/html") {
+		return nil, fmt.Errorf("response is not HTML")
+	}
 
-	// parse body for links
-	doc, err := goquery.NewDocumentFromReader(res.Body)
+	doc, err := goquery.NewDocumentFromReader(io.LimitReader(res.Body, defaultMaxBodySize))
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +49,6 @@ func (c *NetCrawler) Crawl(url string) (*crawl.CrawlResult, error) {
 	doc.Find("a").Each(func(i int, s *goquery.Selection) {
 		link, _ := s.Attr("href")
 		links = append(links, link)
-		println(link)
 	})
 
 	title := doc.Find("title").Text()

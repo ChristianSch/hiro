@@ -2,23 +2,31 @@ package crawl
 
 import (
 	"bytes"
+	"context"
+	"fmt"
+	"net"
+	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ChristianSch/hiro/protagonist/domain/model/crawl"
 	"github.com/ChristianSch/hiro/protagonist/domain/model/index"
 	"github.com/gocolly/colly/v2"
-	"github.com/gocolly/colly/v2/extensions"
 	"go.uber.org/zap"
 
 	"github.com/PuerkitoBio/goquery"
 )
 
+const defaultMaxBodySize = 2 * 1024 * 1024
+
 type CollyConfig struct {
-	// Proxies []string
-	Indexer  index.PageIndexer
-	MaxDepth *int
+	Indexer        index.PageIndexer
+	MaxDepth       *int
+	MaxBodySize    int
+	RequestTimeout time.Duration
+	AllowPrivate   bool
 }
 
 type CollyCrawler struct {
@@ -28,42 +36,72 @@ type CollyCrawler struct {
 }
 
 func NewCollyCrawler(cfg CollyConfig) *CollyCrawler {
-	var maxDepth int = 2
+	maxDepth := 2
 	if cfg.MaxDepth != nil {
 		maxDepth = *cfg.MaxDepth
 	}
+	if maxDepth < 1 {
+		maxDepth = 1
+	}
+	if cfg.MaxBodySize <= 0 {
+		cfg.MaxBodySize = defaultMaxBodySize
+	}
+	if cfg.RequestTimeout <= 0 {
+		cfg.RequestTimeout = 15 * time.Second
+	}
 
-	c := colly.NewCollector(
+	collector := colly.NewCollector(
 		colly.MaxDepth(maxDepth),
 		colly.Async(true),
-		// rate limit
-		// random user agent
+		colly.MaxBodySize(cfg.MaxBodySize),
 	)
-
-	c.Limit(&colly.LimitRule{
-		RandomDelay: 2 * time.Second,
+	collector.SetRequestTimeout(cfg.RequestTimeout)
+	collector.Limit(&colly.LimitRule{
+		DomainGlob:  "*",
+		Delay:       250 * time.Millisecond,
+		RandomDelay: 750 * time.Millisecond,
 		Parallelism: 2,
 	})
+	collector.WithTransport(safeTransport(cfg.AllowPrivate))
 
-	extensions.RandomUserAgent(c)
+	return &CollyCrawler{c: collector, cfg: cfg, indexer: cfg.Indexer}
+}
 
-	// load proxies into round robin switcher
-	// rp, err := proxy.RoundRobinProxySwitcher(proxies.GetAll()...) // list of proxy strings
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// if using async then disable transport keep alives
-	// c.WithTransport(&http.Transport{
-	// 	Proxy:             rp,
-	// 	DisableKeepAlives: true, // must be true
-	// })
-
-	return &CollyCrawler{
-		c:       c,
-		cfg:     cfg,
-		indexer: cfg.Indexer,
+func safeTransport(allowPrivate bool) *http.Transport {
+	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+	return &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          20,
+		MaxIdleConnsPerHost:   4,
+		IdleConnTimeout:       60 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 10 * time.Second,
+		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+			host, port, err := net.SplitHostPort(address)
+			if err != nil {
+				return nil, fmt.Errorf("invalid target address: %w", err)
+			}
+			addresses, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+			if err != nil {
+				return nil, fmt.Errorf("resolve target host: %w", err)
+			}
+			for _, resolved := range addresses {
+				if !allowPrivate && unsafeIP(resolved.IP) {
+					return nil, fmt.Errorf("target resolves to a private or non-routable address")
+				}
+			}
+			if len(addresses) == 0 {
+				return nil, fmt.Errorf("target host has no addresses")
+			}
+			return dialer.DialContext(ctx, network, net.JoinHostPort(addresses[0].IP.String(), port))
+		},
 	}
+}
+
+func unsafeIP(ip net.IP) bool {
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast()
 }
 
 func normalizeURL(rawURL string) string {
@@ -71,81 +109,100 @@ func normalizeURL(rawURL string) string {
 	if err != nil {
 		return rawURL
 	}
-
 	u.Fragment = ""
 	u.Scheme = strings.ToLower(u.Scheme)
 	u.Host = strings.ToLower(u.Host)
-
 	if u.Path != "/" {
 		u.Path = strings.TrimRight(u.Path, "/")
 	}
-
 	return u.String()
 }
 
-func (c *CollyCrawler) Crawl(url string) error {
-	c.c.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		e.Request.Visit(e.Attr("href"))
-	})
+func (c *CollyCrawler) Crawl(startingPoint string) error {
+	startURL, err := url.ParseRequestURI(startingPoint)
+	if err != nil || (startURL.Scheme != "http" && startURL.Scheme != "https") || startURL.Hostname() == "" {
+		return fmt.Errorf("starting URL must be an absolute HTTP or HTTPS URL")
+	}
+	if c.indexer == nil {
+		return fmt.Errorf("page indexer is required")
+	}
+	c.c.AllowedDomains = []string{startURL.Hostname()}
 
-	var err error = nil
+	var errorMu sync.Mutex
+	var firstErr error
+	recordError := func(err error) {
+		if err == nil {
+			return
+		}
+		errorMu.Lock()
+		defer errorMu.Unlock()
+		if firstErr == nil {
+			firstErr = err
+		}
+	}
 
-	c.c.OnResponse(func(res *colly.Response) {
-		pageUrl := normalizeURL(res.Request.URL.String())
-		zap.L().Info("received response", zap.String("url", pageUrl))
-		// convert body to reader
-		body := bytes.NewReader(res.Body)
-
-		// parse body for links
-		doc, err2 := goquery.NewDocumentFromReader(body)
-		if err2 != nil {
-			err = err2
-		} else {
-			bodyText := doc.Find("body").Text()
-
-			links := []crawl.CrawlReference{}
-
-			doc.Find("a").Each(func(i int, s *goquery.Selection) {
-				link, _ := s.Attr("href")
-				links = append(links, link)
-
-				res.Request.Visit(link)
-			})
-
-			title := doc.Find("title").Text()
-			description, _ := doc.Find("meta[name=description]").Attr("content")
-
-			crawl := crawl.CrawlResult{
-				Url:         pageUrl,
-				Title:       title,
-				Description: description,
-				Body:        string(bodyText),
-				References:  links,
-			}
-
-			zap.L().Info("crawled page",
-				zap.String("url", crawl.Url),
-				zap.String("title", crawl.Title),
-				zap.String("description", crawl.Description),
-				zap.Int("references", len(crawl.References)))
-
-			c.indexer.PutPage(crawl)
+	c.c.OnHTML("a[href]", func(element *colly.HTMLElement) {
+		href := strings.TrimSpace(element.Attr("href"))
+		if href == "" {
+			return
+		}
+		if err := element.Request.Visit(href); err != nil && err != colly.ErrAlreadyVisited {
+			zap.L().Debug("skipping discovered URL", zap.Error(err))
 		}
 	})
 
-	c.c.OnRequest(func(r *colly.Request) {
-		zap.L().Info("Visiting", zap.String("url", r.URL.String()))
+	c.c.OnResponse(func(response *colly.Response) {
+		contentType := strings.ToLower(response.Headers.Get("Content-Type"))
+		if !strings.HasPrefix(contentType, "text/html") && !strings.HasPrefix(contentType, "application/xhtml+xml") {
+			zap.L().Debug("skipping non-HTML response", zap.String("content_type", contentType))
+			return
+		}
+
+		pageURL := normalizeURL(response.Request.URL.String())
+		document, parseErr := goquery.NewDocumentFromReader(bytes.NewReader(response.Body))
+		if parseErr != nil {
+			recordError(fmt.Errorf("parse %s: %w", pageURL, parseErr))
+			return
+		}
+
+		references := make([]crawl.CrawlReference, 0)
+		document.Find("a[href]").Each(func(_ int, selection *goquery.Selection) {
+			if link, ok := selection.Attr("href"); ok {
+				references = append(references, link)
+			}
+		})
+
+		result := crawl.CrawlResult{
+			Url:         pageURL,
+			Title:       strings.TrimSpace(document.Find("title").First().Text()),
+			Description: strings.TrimSpace(document.Find(`meta[name="description"]`).First().AttrOr("content", "")),
+			Body:        strings.Join(strings.Fields(document.Find("body").Text()), " "),
+			References:  references,
+		}
+		if result.Body == "" {
+			return
+		}
+		if err := c.indexer.PutPage(result); err != nil {
+			recordError(fmt.Errorf("index %s: %w", pageURL, err))
+			return
+		}
+		zap.L().Info("indexed page", zap.String("url", pageURL), zap.Int("references", len(references)))
 	})
 
-	c.c.OnError(func(res *colly.Response, err error) {
-		zap.L().Error("crawl request failed", zap.String("url", res.Request.URL.String()), zap.Error(err))
+	c.c.OnError(func(response *colly.Response, requestErr error) {
+		pageURL := startingPoint
+		if response != nil && response.Request != nil && response.Request.URL != nil {
+			pageURL = response.Request.URL.String()
+		}
+		recordError(fmt.Errorf("crawl %s: %w", pageURL, requestErr))
 	})
 
-	if visitErr := c.c.Visit(url); visitErr != nil {
-		return visitErr
+	if err := c.c.Visit(startingPoint); err != nil {
+		return err
 	}
-
 	c.c.Wait()
 
-	return err
+	errorMu.Lock()
+	defer errorMu.Unlock()
+	return firstErr
 }
