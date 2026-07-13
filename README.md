@@ -194,7 +194,6 @@ If you do not have uv installed, see https://docs.astral.sh/uv/getting-started/i
 Run Wintermute's embedding and search services in separate terminals:
 
 ```bash
-export HIRO_DATABASE_URL=postgresql://hiro:hiro@127.0.0.1:51432/hiro
 uv run python -m wintermute.embed.server
 uv run python -m wintermute.search.server
 ```
@@ -221,16 +220,22 @@ http://localhost:8973
 
 ### Service configuration
 
-Configuration is owned by each service rather than a shared application-wide object:
+Configuration lives entirely in YAML under `config/`:
 
-- `wintermute/embed/config.py` reads `HIRO_EMBED_*` settings.
-- `wintermute/search/config.py` reads `HIRO_SEARCH_*` settings.
-- Protagonist uses Viper and govalidator. It reads an optional `crawler.yml` or the `HIRO_CRAWLER_*` namespace. See `protagonist/crawler.example.yml`.
-- Yours-Truly uses Viper and govalidator. It reads an optional `web.yml` or the `HIRO_WEB_*` namespace. See `yours-truly/web.example.yml`.
+- `global.yml` contains values shared across services, such as the database, model, and logging defaults.
+- `embed.yml`, `search.yml`, `crawler.yml`, and `web.yml` contain service-owned settings.
 
-Both Python services share only the required `HIRO_DATABASE_URL`, because they connect to the same database. All other settings have local-development defaults. Tokens, TLS, model selection, listener addresses, timeouts, and limits are service-specific and only need to be configured when overriding those defaults.
+Each process loads `global.yml` first and merges its service file over it. Service values win when the same key exists in both files. Go services use Viper for merging and govalidator for validation; Python services apply the same merge order and validate their typed settings.
 
-Set `HIRO_CRAWLER_CONFIG` or `HIRO_WEB_CONFIG` to load a configuration file from a non-default path. Nested Viper keys map to environment variables with underscores; for example, `embedding.address` maps to `HIRO_CRAWLER_EMBEDDING_ADDRESS`.
+Python commands use `config/` by default. The Go commands are normally run from their module directories and therefore use `../config/` by default. Override either default with `--config-dir`:
+
+```bash
+uv run python -m wintermute.search.server --config-dir /etc/hiro
+cd protagonist && go run ./cmd --config-dir /etc/hiro -url https://example.com
+cd yours-truly && go run ./cmd --config-dir /etc/hiro
+```
+
+There is no environment-variable configuration layer.
 
 ### Database setup
 
