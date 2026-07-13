@@ -2,110 +2,57 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"os"
-	"strconv"
-	"time"
 
 	"github.com/ChristianSch/hiro/protagonist/adapters/crawl"
 	"github.com/ChristianSch/hiro/protagonist/adapters/index"
+	appconfig "github.com/ChristianSch/hiro/protagonist/config"
 	"github.com/ChristianSch/hiro/protagonist/infra/logging"
 	"go.uber.org/zap"
 )
 
-type AppConfig struct {
-	Debug         bool
-	StartingPoint string
-	MaxDepth      int
-}
-
 func main() {
-	var maxDepth = flag.Int("max-depth", 2, "max depth of crawling")
-	var startingPoint = flag.String("url", "", "starting point of crawling")
-	var debug = flag.Bool("debug", false, "debug mode")
-
-	flag.Parse()
-
-	if *startingPoint == "" {
-		panic("Url is mandatory. Usage: ./crawl -url https://andinfinity.eu")
+	cfg, err := appconfig.Load()
+	if err != nil {
+		panic(err)
 	}
 
-	// get the starting point
-	run(AppConfig{
-		Debug:         *debug,
-		StartingPoint: *startingPoint,
-		MaxDepth:      *maxDepth,
-	})
+	flag.StringVar(&cfg.Crawl.StartURL, "url", cfg.Crawl.StartURL, "starting point of crawling")
+	flag.IntVar(&cfg.Crawl.MaxDepth, "max-depth", cfg.Crawl.MaxDepth, "max depth of crawling")
+	flag.BoolVar(&cfg.Debug, "debug", cfg.Debug, "debug mode")
+	flag.Parse()
+
+	if cfg.Crawl.StartURL == "" {
+		panic("URL is mandatory. Usage: ./crawl -url https://example.com")
+	}
+	run(cfg)
 }
 
-func run(cfg AppConfig) {
+func run(cfg appconfig.Config) {
 	logger := logging.InitLogger(cfg.Debug)
-	zap.ReplaceGlobals(logger)
+	defer logger.Sync()
+	undo := zap.ReplaceGlobals(logger)
+	defer undo()
 
 	indexer, err := index.NewWintermuteIndexer(index.WintermuteConfig{
-		Host:       envOrDefault("HIRO_EMBED_GRPC_ADDRESS", "127.0.0.1:50052"),
-		Token:      os.Getenv("HIRO_SERVICE_TOKEN"),
-		Timeout:    durationEnv("HIRO_EMBED_TIMEOUT", 30*time.Second),
-		Insecure:   boolEnv("HIRO_GRPC_INSECURE", true),
-		ServerName: os.Getenv("HIRO_GRPC_SERVER_NAME"),
+		Host:       cfg.Embedding.Address,
+		Token:      cfg.Embedding.Token,
+		Timeout:    cfg.Embedding.Timeout,
+		Insecure:   cfg.Embedding.Insecure,
+		ServerName: cfg.Embedding.ServerName,
 	})
 	if err != nil {
 		panic(err)
 	}
 	defer indexer.Close()
+
 	crawler := crawl.NewCollyCrawler(crawl.CollyConfig{
 		Indexer:        indexer,
-		MaxDepth:       &cfg.MaxDepth,
-		MaxBodySize:    intEnv("HIRO_CRAWL_MAX_BODY_BYTES", 2*1024*1024),
-		RequestTimeout: durationEnv("HIRO_CRAWL_REQUEST_TIMEOUT", 15*time.Second),
-		AllowPrivate:   boolEnv("HIRO_CRAWL_ALLOW_PRIVATE", false),
+		MaxDepth:       &cfg.Crawl.MaxDepth,
+		MaxBodySize:    cfg.Crawl.MaxBodyBytes,
+		RequestTimeout: cfg.Crawl.RequestTimeout,
 	})
-	err = crawler.Crawl(cfg.StartingPoint)
-	if err != nil {
+	if err := crawler.Crawl(cfg.Crawl.StartURL); err != nil {
 		panic(err)
 	}
 	logger.Info("crawling finished")
-}
-
-func envOrDefault(name, fallback string) string {
-	if value := os.Getenv(name); value != "" {
-		return value
-	}
-	return fallback
-}
-
-func boolEnv(name string, fallback bool) bool {
-	raw := os.Getenv(name)
-	if raw == "" {
-		return fallback
-	}
-	value, err := strconv.ParseBool(raw)
-	if err != nil {
-		panic(fmt.Errorf("invalid %s: %w", name, err))
-	}
-	return value
-}
-
-func intEnv(name string, fallback int) int {
-	raw := os.Getenv(name)
-	if raw == "" {
-		return fallback
-	}
-	value, err := strconv.Atoi(raw)
-	if err != nil || value <= 0 {
-		panic(fmt.Errorf("invalid %s integer %q", name, raw))
-	}
-	return value
-}
-
-func durationEnv(name string, fallback time.Duration) time.Duration {
-	raw := os.Getenv(name)
-	if raw == "" {
-		return fallback
-	}
-	value, err := time.ParseDuration(raw)
-	if err != nil || value <= 0 {
-		panic(fmt.Errorf("invalid %s duration %q", name, raw))
-	}
-	return value
 }

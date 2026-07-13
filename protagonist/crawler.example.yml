@@ -1,0 +1,9 @@
+embedding:
+  address: 127.0.0.1:50052
+  timeout: 30s
+  insecure: true
+
+crawl:
+  max_depth: 2
+  max_body_bytes: 2097152
+  request_timeout: 15s

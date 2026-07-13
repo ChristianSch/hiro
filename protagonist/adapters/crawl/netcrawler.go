@@ -19,7 +19,7 @@ type NetCrawler struct {
 func NewNetCrawler() *NetCrawler {
 	return &NetCrawler{client: &http.Client{
 		Timeout:   15 * time.Second,
-		Transport: safeTransport(false),
+		Transport: crawlerTransport(),
 	}}
 }
 

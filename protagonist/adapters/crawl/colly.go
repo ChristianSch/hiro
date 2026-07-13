@@ -2,9 +2,7 @@ package crawl
 
 import (
 	"bytes"
-	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -26,7 +24,6 @@ type CollyConfig struct {
 	MaxDepth       *int
 	MaxBodySize    int
 	RequestTimeout time.Duration
-	AllowPrivate   bool
 }
 
 type CollyCrawler struct {
@@ -62,13 +59,12 @@ func NewCollyCrawler(cfg CollyConfig) *CollyCrawler {
 		RandomDelay: 750 * time.Millisecond,
 		Parallelism: 2,
 	})
-	collector.WithTransport(safeTransport(cfg.AllowPrivate))
+	collector.WithTransport(crawlerTransport())
 
 	return &CollyCrawler{c: collector, cfg: cfg, indexer: cfg.Indexer}
 }
 
-func safeTransport(allowPrivate bool) *http.Transport {
-	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+func crawlerTransport() *http.Transport {
 	return &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
 		ForceAttemptHTTP2:     true,
@@ -77,31 +73,7 @@ func safeTransport(allowPrivate bool) *http.Transport {
 		IdleConnTimeout:       60 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ResponseHeaderTimeout: 10 * time.Second,
-		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
-			host, port, err := net.SplitHostPort(address)
-			if err != nil {
-				return nil, fmt.Errorf("invalid target address: %w", err)
-			}
-			addresses, err := net.DefaultResolver.LookupIPAddr(ctx, host)
-			if err != nil {
-				return nil, fmt.Errorf("resolve target host: %w", err)
-			}
-			for _, resolved := range addresses {
-				if !allowPrivate && unsafeIP(resolved.IP) {
-					return nil, fmt.Errorf("target resolves to a private or non-routable address")
-				}
-			}
-			if len(addresses) == 0 {
-				return nil, fmt.Errorf("target host has no addresses")
-			}
-			return dialer.DialContext(ctx, network, net.JoinHostPort(addresses[0].IP.String(), port))
-		},
 	}
-}
-
-func unsafeIP(ip net.IP) bool {
-	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
-		ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast()
 }
 
 func normalizeURL(rawURL string) string {
