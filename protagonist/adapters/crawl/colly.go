@@ -2,6 +2,7 @@ package crawl
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -118,8 +119,11 @@ func (c *CollyCrawler) Crawl(startingPoint string) error {
 		if href == "" {
 			return
 		}
-		if err := element.Request.Visit(href); err != nil && err != colly.ErrAlreadyVisited {
-			zap.L().Debug("skipping discovered URL", zap.Error(err))
+		if err := element.Request.Visit(href); err != nil {
+			var alreadyVisited *colly.AlreadyVisitedError
+			if !errors.As(err, &alreadyVisited) {
+				zap.L().Debug("skipping discovered URL", zap.Error(err))
+			}
 		}
 	})
 
