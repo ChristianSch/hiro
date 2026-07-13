@@ -12,10 +12,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/static/base.css">
-    <link href="/static/tailwind.min.css" rel="stylesheet">
-    <script defer src="/static/alpine.min.js"></script>
-    <script defer src="/static/htmx.1.9.2.js"></script>
+    <link rel="stylesheet" href="{{ asset "/static/base.css" }}">
+    <link href="{{ asset "/static/tailwind.min.css" }}" rel="stylesheet">
+    <script defer src="{{ asset "/static/alpine.min.js" }}"></script>
+    <script defer src="{{ asset "/static/htmx.1.9.2.js" }}"></script>
     <meta name="msapplication-TileColor" content="#7cd1cd">
     <title>Hiro :: Search Engine</title>
 </head>
@@ -26,11 +26,11 @@
           x-bind:aria-pressed="isDark().toString()"
           x-bind:aria-label="isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
           x-bind:title="isDark() ? 'Switch to light mode' : 'Switch to dark mode'">
-    <svg x-cloak x-show="isDark()" viewBox="0 0 24 24" aria-hidden="true">
+    <svg x-cloak x-show="isDark()" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="4"></circle>
       <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"></path>
     </svg>
-    <svg x-cloak x-show="!isDark()" viewBox="0 0 24 24" aria-hidden="true">
+    <svg x-cloak x-show="!isDark()" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"></path>
     </svg>
   </button>

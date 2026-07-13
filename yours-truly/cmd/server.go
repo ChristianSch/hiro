@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"flag"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -54,7 +56,17 @@ func main() {
 	}
 	defer searcher.Close()
 
+	asset, err := newAssetURL("./static", []string{
+		"/static/base.css",
+		"/static/tailwind.min.css",
+		"/static/alpine.min.js",
+		"/static/htmx.1.9.2.js",
+	})
+	if err != nil {
+		logger.Fatal("version static assets", zap.Error(err))
+	}
 	engine := html.New("./views", ".gohtml")
+	engine.AddFunc("asset", asset)
 	app := fiber.New(fiber.Config{
 		Views:                   engine,
 		ViewsLayout:             "layouts/main",
@@ -94,7 +106,7 @@ func main() {
 		},
 	})
 
-	app.Static("/static", "./static", fiber.Static{MaxAge: 86400})
+	app.Static("/static", "./static", fiber.Static{MaxAge: 31536000})
 	app.Get("/", func(ctx *fiber.Ctx) error {
 		return ctx.Render("search", fiber.Map{}, "layouts/main")
 	})
@@ -162,4 +174,26 @@ func main() {
 			logger.Error("graceful shutdown failed", zap.Error(err))
 		}
 	}
+}
+
+func newAssetURL(staticDir string, publicPaths []string) (func(string) string, error) {
+	versioned := make(map[string]string, len(publicPaths))
+	for _, publicPath := range publicPaths {
+		relativePath := strings.TrimPrefix(publicPath, "/static/")
+		if relativePath == publicPath || relativePath == "" || strings.Contains(relativePath, "..") {
+			return nil, fmt.Errorf("invalid static asset path %q", publicPath)
+		}
+		content, err := os.ReadFile(filepath.Join(staticDir, relativePath))
+		if err != nil {
+			return nil, fmt.Errorf("read static asset %s: %w", publicPath, err)
+		}
+		digest := sha256.Sum256(content)
+		versioned[publicPath] = fmt.Sprintf("%s?v=%x", publicPath, digest[:8])
+	}
+	return func(publicPath string) string {
+		if value, ok := versioned[publicPath]; ok {
+			return value
+		}
+		return publicPath
+	}, nil
 }
