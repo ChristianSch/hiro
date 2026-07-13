@@ -1,35 +1,110 @@
-Bluntly: **this is a development prototype, not production-ready**.
+# Production readiness audit
 
-The biggest problems are:
+_Updated: 2026-07-13_
 
-- The gRPC services listen on all interfaces without TLS or authentication. The embedding endpoint permits arbitrary document writes.
-- PostgreSQL is exposed with hardcoded `hiro/hiro` credentials. Hosts, ports, model, device, and DSNs are hardcoded throughout.
-- The Python embedding service shares one transactional database connection across ten worker threads. Concurrent requests can interfere, and one failed transaction can poison subsequent requests.
-- The crawler follows links without domain restrictions, private-network protection, response-size limits, or content-type checks. This creates SSRF, runaway-crawl, and memory-exhaustion risks.
-- Crawler indexing failures are silently discarded at `protagonist/adapters/crawl/colly.go:132`. Its shared `err` variable is also written asynchronously without synchronization.
-- Search and indexing gRPC calls use `context.Background()` without deadlines. Requests can hang indefinitely.
-- Search has no authentication, request-size controls, rate limiting, or query-length limits. Model inference therefore provides an easy resource-exhaustion target.
-- Hybrid search likely performs poorly at scale: the combined vector/full-text expression in `002_hybrid_search.sql` prevents straightforward HNSW top-K execution. Empty searches use `ORDER BY random()`, another full-table operation.
-- `GrpcSearcher.Search` can dereference `u` after `url.Parse` fails at `yours-truly/adapters/search/grpc_searcher.go:81-94`.
-- Pagination exists in the protocol but is ignored; every search is hardcoded to ten results.
-- The browser builds a regular expression directly from user input. Invalid or pathological expressions can break or stall highlighting. History URLs are also constructed without URL-encoding the query.
-- Raw internal exception text is returned through gRPC, while queries, results, and potentially sensitive content are logged at debug level.
-- Entire document contents are returned over gRPC even though the UI does not use them.
-- There is no graceful shutdown, connection cleanup, database pool, retry policy, circuit breaker, backpressure, or explicit service readiness for embedding.
-- There is no CI, production container image, deployment configuration, secrets strategy, metrics, tracing, alerting, backup guidance, or operational runbook.
-- The Apple-only `device='mps'` configuration prevents deployment on ordinary Linux CPU/CUDA hosts.
+## Current verdict
 
-Validation succeeded superficially: both Go projects build, `go vet` passes, race-enabled tests pass, and Python compiles. However, the coverage is negligible:
+Hiro has moved from an unsafe development prototype to a substantially hardened local application, but it is **not yet production-ready**. The immediate correctness, concurrency, configuration, and known dependency-vulnerability findings from the original audit have largely been resolved. The remaining blockers are primarily deployment, observability, resilience, test depth, and search scalability.
 
-- Protagonist: **zero tested packages**, eight packages with no tests.
-- Yours Truly: only one tested package, primarily status mapping.
-- Python: only three readiness tests, and all three emit ignored `__del__` exceptions.
-- No database, migration, embedding, crawler, HTTP, concurrency, or end-to-end tests.
+## Resolved since the original audit
 
-Dependency scanning is also blocking:
+- Services now use typed, validated, layered YAML configuration from `config/global.yml` plus a service-specific file.
+- Python gRPC services bind to loopback by default. Non-loopback listeners require a service token, and TLS certificates can be configured.
+- Go gRPC clients support authenticated metadata, TLS, request deadlines, and explicit connection cleanup.
+- Python services use bounded PostgreSQL connection pools instead of sharing one transactional connection across worker threads.
+- Embedding requests validate URL scheme, required content, metadata length, and content size. Both gRPC servers enforce message-size limits.
+- The crawler is restricted to the starting domain, limits response size, rejects non-HTML responses, applies request timeouts and concurrency limits, and propagates parsing, network, and indexing failures safely.
+- Crawler asynchronous error handling no longer races, and duplicate-visit errors are handled explicitly.
+- Search queries have length and pagination validation. The UI and gRPC calls have deadlines, and HTTP search routes are rate-limited.
+- The Go search adapter no longer dereferences an invalid parsed URL.
+- Unsafe client-side regular-expression highlighting was removed, and history URLs are URL-encoded.
+- Internal exception details are no longer returned to clients. Search queries and complete result rows are no longer emitted in debug logs.
+- Search responses no longer send full document bodies that the web UI does not consume.
+- Go and Python services now close connections and pools and perform graceful shutdown where supported.
+- Model name and device are configurable; CPU is the portable default.
+- Static assets use content-hashed URLs, and the search-result layout has bounded responsive dimensions and safe wrapping.
+- Go is pinned to patched toolchain version `1.26.5`. Go and Python dependencies were upgraded to patched versions.
+- `govulncheck` reports no vulnerabilities for either Go module, and `pip-audit` reports no known Python vulnerabilities.
 
-- Protagonist: **12 reachable vulnerabilities**, largely from the very old `golang.org/x/net v0.9.0`.
-- Yours Truly: **4 reachable vulnerabilities**, including Fiber DoS; Fiber is `v2.48.0`, with the cited fix in `v2.52.12`.
-- Python: **12 known vulnerabilities** across Pillow, protobuf, Torch, and Transformers.
+## Remaining production blockers
 
-The good foundations are the clear service boundaries, parameterized SQL, pinned Python environment, database migrations, basic health status, and a search-quality evaluation harness. But I would not expose the current system to an untrusted network or meaningful production traffic.
+### 1. Delivery and operations
+
+There is still no CI workflow, production container image, deployment definition, secrets-delivery mechanism, operational runbook, or documented release/rollback process. The existing Compose file only starts a development PostgreSQL instance, publishes it on the host, and uses development credentials.
+
+Before production deployment, add:
+
+- CI gates for formatting, tests, race detection, vet, builds, migration validation, `govulncheck`, and `pip-audit`.
+- Reproducible, non-root container images for the Python services and web application.
+- A production topology with private service networking, mounted configuration/secrets, health checks, restart policies, and resource limits.
+- Database backup, restore, migration rollback, and disaster-recovery procedures.
+
+### 2. Test depth remains insufficient
+
+The test suite passes, but coverage is still shallow:
+
+- Protagonist has one test file covering configuration; eight packages have no tests.
+- Yours-Truly has tests for configuration, asset versioning, and limited gRPC status mapping, but no HTTP handler integration tests.
+- Wintermute has eight unit tests focused on configuration, status behavior, and the random-result limit.
+- There are no automated database migration, embedding, crawler, authentication/TLS, concurrency, failure-recovery, or end-to-end tests.
+
+The race detector currently passes, but it cannot validate crawler concurrency paths that are not exercised by tests.
+
+### 3. Search scalability is unresolved
+
+`db/migrations/002_hybrid_search.sql` combines vector similarity and full-text ranking in a way that is likely to require broad candidate evaluation rather than an efficient HNSW top-K lookup. This needs `EXPLAIN (ANALYZE, BUFFERS)` against production-scale data and probably a two-stage candidate query before claiming scalable search.
+
+The landing-page query still uses `ORDER BY random()`, which becomes a full-table operation as the document count grows. Replace it with preselected random IDs, sampling, or a maintained random key if the corpus becomes large.
+
+No load tests or latency budgets currently exist for model inference, database search, crawling, or the web tier.
+
+### 4. Remote-service security is configurable, not fully enforced
+
+Loopback defaults are safe for local development, and non-loopback Python listeners require a token. However:
+
+- TLS remains optional.
+- Authentication is a single static bearer token without service identity, rotation, or revocation.
+- Direct gRPC search traffic has validation and message limits but no server-side rate limiter.
+- Production configuration files may contain credentials and therefore must be delivered as protected mounted secrets, not committed.
+
+The crawler intentionally allows resolvable private addresses. That is acceptable while it remains an operator-controlled CLI. If crawl targets ever become user-controlled or remotely submitted, private/link-local/metadata address protections become mandatory to prevent SSRF.
+
+### 5. Resilience and readiness are incomplete
+
+The application now has deadlines, pools, and graceful shutdown, but still lacks retry policy, circuit breaking, load shedding, and explicit backpressure around model inference and indexing. Retries must be bounded and limited to idempotent operations.
+
+The search service exposes dependency status, but the embedding service has no equivalent readiness RPC. There is no readiness distinction between process startup, model warmup, database availability, and the ability to serve an embedding.
+
+### 6. Observability is still logging-only
+
+Structured logs exist, but there are no service metrics, traces, dashboards, or alerts. At minimum, production operation needs:
+
+- Request count, latency, and error rate by RPC/route.
+- Model inference duration and queue depth.
+- Database pool saturation and query duration.
+- Crawl throughput, rejection count, and indexing failures.
+- Health/readiness state and alerting thresholds.
+
+### 7. Data lifecycle is undefined
+
+Documents have no crawl timestamp, update timestamp, source ownership, model/version metadata, or stale-document deletion policy. Embedding dimensions are fixed in the schema, but there is no migration strategy for changing embedding models. Retention, recrawling, deletion, and re-embedding behavior must be defined before operating a durable corpus.
+
+## Current validation baseline
+
+The following currently pass:
+
+- Both Go test suites.
+- Go race detector and `go vet` for both modules.
+- Builds for the crawler and web application.
+- Python compilation and all eight Python unit tests.
+- `govulncheck` for both Go modules with no reported vulnerabilities.
+- `pip-audit` with no known Python vulnerabilities.
+
+## Recommended next order
+
+1. Add CI and meaningful crawler, HTTP, database, and end-to-end tests.
+2. Add production containers, private networking, secret-mounted configuration, and health checks.
+3. Benchmark and redesign hybrid retrieval using production-scale data.
+4. Add embedding readiness, metrics, tracing, dashboards, and alerts.
+5. Define backup/restore, data lifecycle, recrawling, and embedding-model migration procedures.
+6. Add load testing, resilience controls, and a documented release/rollback runbook.
