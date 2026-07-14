@@ -1,4 +1,5 @@
 import unittest
+from contextlib import nullcontext
 from types import SimpleNamespace
 
 import grpc
@@ -13,8 +14,9 @@ from .stubs.search_pb2 import (
 
 
 class FakeCursor:
-    def __init__(self, result=(1,), error=None):
+    def __init__(self, result=(1,), rows=None, error=None):
         self._result = result
+        self._rows = rows or []
         self._error = error
         self.query = None
         self.parameters = None
@@ -36,18 +38,22 @@ class FakeCursor:
         return self._result
 
     def fetchall(self):
-        return []
+        return self._rows
 
 
 class FakeConnection:
-    def __init__(self, result=(1,), error=None):
+    def __init__(self, result=(1,), rows=None, error=None):
         self._result = result
+        self._rows = rows or []
         self._error = error
         self.last_cursor = None
 
     def cursor(self):
-        self.last_cursor = FakeCursor(self._result, self._error)
+        self.last_cursor = FakeCursor(self._result, self._rows, self._error)
         return self.last_cursor
+
+    def transaction(self):
+        return nullcontext()
 
 
 class FakeContext:
@@ -62,7 +68,14 @@ class SearchServerStatusTest(unittest.TestCase):
         server = SearchServer.__new__(SearchServer)
         server._conn = connection
         server._model = model
-        server._settings = SimpleNamespace(service_token=None)
+        server._settings = SimpleNamespace(
+            service_token=None,
+            match_threshold=0.78,
+            vector_candidates=200,
+            text_candidates=200,
+            hnsw_ef_search=200,
+            hnsw_iterative_scan="relaxed_order",
+        )
         return server
 
     def test_reports_operational_when_model_and_database_are_ready(self):
@@ -95,10 +108,35 @@ class SearchServerStatusTest(unittest.TestCase):
         connection = FakeConnection()
         server = self.make_server(connection)
 
-        server.Search(SearchRequest(), FakeContext())
+        response = server.Search(SearchRequest(), FakeContext())
 
-        self.assertIn("ORDER BY random()", connection.last_cursor.query)
-        self.assertEqual((5, 0), connection.last_cursor.parameters)
+        self.assertIn("random_documents", connection.last_cursor.query)
+        self.assertEqual((5,), connection.last_cursor.parameters)
+        self.assertEqual(1, response.page_number)
+        self.assertFalse(response.has_next)
+
+    def test_search_returns_page_metadata_and_trims_lookahead(self):
+        rows = [
+            (1, "https://example.com/1", "One", "First", "snippet", 0.9),
+            (2, "https://example.com/2", "Two", "Second", "snippet", 0.8),
+            (3, "https://example.com/3", "Three", "Third", "snippet", 0.7),
+        ]
+        connection = FakeConnection(rows=rows)
+        server = self.make_server(connection)
+        server._encode_query = lambda query: [0.0] * 768
+
+        response = server.Search(
+            SearchRequest(query="example", page_number=2, result_per_page=2),
+            FakeContext(),
+        )
+
+        self.assertEqual(2, response.page_number)
+        self.assertTrue(response.has_next)
+        self.assertEqual(2, len(response.results))
+        self.assertIn("match_documents", connection.last_cursor.query)
+        self.assertEqual(0.78, connection.last_cursor.parameters[2])
+        self.assertEqual(2, connection.last_cursor.parameters[3])
+        self.assertEqual(3, connection.last_cursor.parameters[4])
 
     def test_reports_unavailable_when_model_is_not_loaded(self):
         server = self.make_server(FakeConnection(), model=None)

@@ -9,3 +9,10 @@ server:
 
 database:
   pool_size: 8
+
+retrieval:
+  match_threshold: 0.78
+  vector_candidates: 200
+  text_candidates: 200
+  hnsw_ef_search: 200
+  hnsw_iterative_scan: relaxed_order

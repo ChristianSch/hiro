@@ -39,5 +39,31 @@
             We couldn't find any results for: {{ .query }}. Sorry :(
         {{end}}
     {{end}}
+
+    {{if .page}}
+        <nav class="search-pagination" aria-label="Search result pages">
+            {{if .page.HasPrevious}}
+                <a href="{{ .previousURL }}"
+                   hx-get="{{ .previousHTMX }}"
+                   hx-target="#search-container"
+                   hx-swap="outerHTML"
+                   hx-indicator="#search-field"
+                   rel="prev">Previous</a>
+            {{else}}
+                <span class="search-pagination-placeholder" aria-hidden="true">Previous</span>
+            {{end}}
+            <span aria-current="page">Page {{ .page.PageNumber }}</span>
+            {{if .page.HasNext}}
+                <a href="{{ .nextURL }}"
+                   hx-get="{{ .nextHTMX }}"
+                   hx-target="#search-container"
+                   hx-swap="outerHTML"
+                   hx-indicator="#search-field"
+                   rel="next">Next</a>
+            {{else}}
+                <span class="search-pagination-placeholder" aria-hidden="true">Next</span>
+            {{end}}
+        </nav>
+    {{end}}
     </div>
 </div>

@@ -18,6 +18,8 @@ message SearchResponse {
     string description = 4;
   }
   repeated Result results = 1;
+  int32 page_number = 2;
+  bool has_next = 3;
 }
 
 enum OperationalState {

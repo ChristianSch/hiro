@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	pb "github.com/ChristianSch/hiro/yours-truly/adapters/search/grpc"
 	"google.golang.org/grpc"
@@ -12,14 +13,50 @@ import (
 type fakeSearchClient struct {
 	statusResponse *pb.StatusResponse
 	statusError    error
+	searchResponse *pb.SearchResponse
+	searchRequest  *pb.SearchRequest
 }
 
-func (f *fakeSearchClient) Search(context.Context, *pb.SearchRequest, ...grpc.CallOption) (*pb.SearchResponse, error) {
-	return &pb.SearchResponse{}, nil
+func (f *fakeSearchClient) Search(_ context.Context, request *pb.SearchRequest, _ ...grpc.CallOption) (*pb.SearchResponse, error) {
+	f.searchRequest = request
+	if f.searchResponse == nil {
+		return &pb.SearchResponse{}, nil
+	}
+	return f.searchResponse, nil
 }
 
 func (f *fakeSearchClient) Status(context.Context, *pb.StatusRequest, ...grpc.CallOption) (*pb.StatusResponse, error) {
 	return f.statusResponse, f.statusError
+}
+
+func TestSearchMapsPagination(t *testing.T) {
+	client := &fakeSearchClient{searchResponse: &pb.SearchResponse{
+		PageNumber: 2,
+		HasNext:    true,
+		Results: []*pb.SearchResponse_Result{{
+			Url:         "https://example.com/docs",
+			Title:       "Docs",
+			Description: "Example docs",
+		}},
+	}}
+	searcher := &GrpcSearcher{
+		cfg:    GrpcSearcherConfig{Timeout: time.Second},
+		client: client,
+	}
+
+	page, err := searcher.Search(context.Background(), "example", 2, 10)
+	if err != nil {
+		t.Fatalf("Search returned an error: %v", err)
+	}
+	if client.searchRequest.PageNumber != 2 || client.searchRequest.ResultPerPage != 10 {
+		t.Fatalf("unexpected request pagination: %#v", client.searchRequest)
+	}
+	if page.PageNumber != 2 || !page.HasPrevious || !page.HasNext {
+		t.Fatalf("unexpected page metadata: %#v", page)
+	}
+	if len(page.Results) != 1 || page.Results[0].Page != "/docs" {
+		t.Fatalf("unexpected mapped results: %#v", page.Results)
+	}
 }
 
 func TestStatusMapsAggregateAndDependencyStates(t *testing.T) {

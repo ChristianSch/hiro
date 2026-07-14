@@ -6,6 +6,7 @@ from pathlib import Path
 from ..configuration import (
     boolean,
     load_layered_config,
+    number,
     optional_string,
     positive_int,
     required_string,
@@ -29,6 +30,11 @@ class SearchSettings:
     max_message_bytes: int
     database_pool_size: int
     reflection_enabled: bool
+    match_threshold: float
+    vector_candidates: int
+    text_candidates: int
+    hnsw_ef_search: int
+    hnsw_iterative_scan: str
 
     @classmethod
     def from_files(
@@ -41,11 +47,20 @@ class SearchSettings:
         model = section(config, "model")
         logging = section(config, "logging")
         server = section(config, "server")
+        retrieval = section(config, "retrieval")
 
         listen_address = required_string(server, "address")
         service_token = optional_string(server, "token")
         validate_listener(listen_address, service_token)
         certificate, private_key = tls_paths(server)
+        match_threshold = number(retrieval, "match_threshold")
+        if not -1 <= match_threshold <= 1:
+            raise ValueError("retrieval.match_threshold must be between -1 and 1")
+        iterative_scan = required_string(retrieval, "hnsw_iterative_scan")
+        if iterative_scan not in {"off", "strict_order", "relaxed_order"}:
+            raise ValueError(
+                "retrieval.hnsw_iterative_scan must be off, strict_order, or relaxed_order"
+            )
 
         return cls(
             database_url=required_string(database, "url"),
@@ -60,4 +75,9 @@ class SearchSettings:
             max_message_bytes=positive_int(server, "max_message_bytes"),
             database_pool_size=positive_int(database, "pool_size"),
             reflection_enabled=boolean(server, "reflection"),
+            match_threshold=match_threshold,
+            vector_candidates=positive_int(retrieval, "vector_candidates"),
+            text_candidates=positive_int(retrieval, "text_candidates"),
+            hnsw_ef_search=positive_int(retrieval, "hnsw_ef_search"),
+            hnsw_iterative_scan=iterative_scan,
         )

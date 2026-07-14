@@ -9,3 +9,8 @@ server:
 
 database:
   pool_size: 8
+
+chunking:
+  max_tokens: 384
+  overlap_tokens: 64
+  batch_size: 32

@@ -1,4 +1,6 @@
 import argparse
+import threading
+from functools import lru_cache
 from pathlib import Path
 
 import logging
@@ -42,6 +44,7 @@ class SearchServer(SearchServiceServicer):
             settings.model_name,
             device=settings.model_device,
         )
+        self._inference_lock = threading.Lock()
         self._init_db()
 
     def _init_db(self):
@@ -69,6 +72,11 @@ class SearchServer(SearchServiceServicer):
         if self._pool is not None:
             self._pool.close()
             logging.info('Database connection pool closed.')
+
+    @lru_cache(maxsize=1_024)
+    def _encode_query(self, query: str):
+        with self._inference_lock:
+            return self._model.encode(query, normalize_embeddings=True)
 
     def Status(self, request: StatusRequest, context):
         require_authorization(
@@ -119,30 +127,61 @@ class SearchServer(SearchServiceServicer):
         if result_per_page < 1 or result_per_page > 50:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "result_per_page must be between 1 and 50")
         offset = (page_number - 1) * result_per_page
+        has_next = False
 
         try:
             if not request.query.strip():
                 with self._connection() as connection:
                     with connection.cursor() as cur:
                         res = cur.execute(
-                        '''SELECT id, url, title, content, description
-                           FROM documents
-                           WHERE url IS NOT NULL AND url <> ''
-                           ORDER BY random()
-                           LIMIT %s OFFSET %s''',
-                            (result_per_page, offset),
+                            "SELECT * FROM random_documents(%s)",
+                            (result_per_page,),
                         ).fetchall()
                 logging.info('Random websites request')
             else:
-                search = self._model.encode(request.query)
+                search = self._encode_query(request.query)
                 logging.debug('Search vector: %d', len(search))
+                fetch_count = result_per_page + 1
+                vector_candidates = max(
+                    self._settings.vector_candidates,
+                    offset + fetch_count,
+                )
+                text_candidates = max(
+                    self._settings.text_candidates,
+                    offset + fetch_count,
+                )
+                ef_search = max(
+                    self._settings.hnsw_ef_search,
+                    vector_candidates,
+                )
 
                 with self._connection() as connection:
-                    with connection.cursor() as cur:
-                        res = cur.execute(
-                            'SELECT * FROM match_documents(%s, %s, 0.78, %s) OFFSET %s',
-                            (search, request.query, result_per_page + offset, offset),
-                        ).fetchall()
+                    with connection.transaction():
+                        with connection.cursor() as cur:
+                            cur.execute(
+                                "SELECT set_config('hnsw.ef_search', %s, true)",
+                                (str(ef_search),),
+                            )
+                            cur.execute(
+                                "SELECT set_config('hnsw.iterative_scan', %s, true)",
+                                (self._settings.hnsw_iterative_scan,),
+                            )
+                            res = cur.execute(
+                                '''SELECT * FROM match_documents(
+                                     %s, %s, %s, %s, %s, %s, %s
+                                   )''',
+                                (
+                                    search,
+                                    request.query,
+                                    self._settings.match_threshold,
+                                    offset,
+                                    fetch_count,
+                                    vector_candidates,
+                                    text_candidates,
+                                ),
+                            ).fetchall()
+                has_next = len(res) > result_per_page
+                res = res[:result_per_page]
 
             context.set_code(grpc.StatusCode.OK)
 
@@ -156,12 +195,16 @@ class SearchServer(SearchServiceServicer):
             # 4. document content
             # 5. document description
             # 6. hybrid similarity score
-            return SearchResponse(results=[SearchResponse.Result(
-                url=r[1],
-                title=r[2],
-                content='',
-                description=r[4],
-            ) for r in res])
+            return SearchResponse(
+                results=[SearchResponse.Result(
+                    url=r[1],
+                    title=r[2],
+                    content=(r[4] if request.query.strip() else ''),
+                    description=r[3],
+                ) for r in res],
+                page_number=page_number,
+                has_next=has_next,
+            )
 
         except Exception:
             logging.exception('Search request failed')

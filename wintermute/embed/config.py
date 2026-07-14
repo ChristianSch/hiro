@@ -29,6 +29,9 @@ class EmbeddingSettings:
     max_message_bytes: int
     database_pool_size: int
     reflection_enabled: bool
+    chunk_max_tokens: int
+    chunk_overlap_tokens: int
+    embedding_batch_size: int
 
     @classmethod
     def from_files(
@@ -41,11 +44,16 @@ class EmbeddingSettings:
         model = section(config, "model")
         logging = section(config, "logging")
         server = section(config, "server")
+        chunking = section(config, "chunking")
 
         listen_address = required_string(server, "address")
         service_token = optional_string(server, "token")
         validate_listener(listen_address, service_token)
         certificate, private_key = tls_paths(server)
+        chunk_max_tokens = positive_int(chunking, "max_tokens")
+        chunk_overlap_tokens = positive_int(chunking, "overlap_tokens")
+        if chunk_overlap_tokens >= chunk_max_tokens:
+            raise ValueError("chunking.overlap_tokens must be smaller than max_tokens")
 
         return cls(
             database_url=required_string(database, "url"),
@@ -60,4 +68,7 @@ class EmbeddingSettings:
             max_message_bytes=positive_int(server, "max_message_bytes"),
             database_pool_size=positive_int(database, "pool_size"),
             reflection_enabled=boolean(server, "reflection"),
+            chunk_max_tokens=chunk_max_tokens,
+            chunk_overlap_tokens=chunk_overlap_tokens,
+            embedding_batch_size=positive_int(chunking, "batch_size"),
         )

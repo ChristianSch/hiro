@@ -60,6 +60,13 @@ def optional_string(config: dict[str, Any], key: str) -> str | None:
     return value
 
 
+def number(config: dict[str, Any], key: str) -> float:
+    value = config.get(key)
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise ValueError(f"configuration value {key!r} must be a number")
+    return float(value)
+
+
 def positive_int(config: dict[str, Any], key: str) -> int:
     value = config.get(key)
     if not isinstance(value, int) or isinstance(value, bool) or value < 1:

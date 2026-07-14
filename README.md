@@ -54,7 +54,7 @@ The embedding service is implemented in:
 wintermute/embed/server.py
 ```
 
-It receives crawled pages using the service defined in `proto/embedding.proto`. For each page, it loads the `BAAI/bge-base-en` SentenceTransformer model, embeds the page content, and inserts or updates the document in Postgres.
+It receives crawled pages using the service defined in `proto/embedding.proto`, splits each page into overlapping token chunks, embeds chunks in batches, and atomically replaces the document's searchable chunks in Postgres. Unchanged content with current-model embeddings is not re-embedded.
 
 The search service is implemented in:
 
@@ -66,14 +66,14 @@ It receives search queries using the service defined in `proto/search.proto`. Fo
 
 ### Postgres + pgvector: storage and retrieval
 
-Postgres stores the crawled documents and their embeddings in a `documents` table. The `embedding` column uses pgvector's `vector(768)` type, matching the output size of `BAAI/bge-base-en`.
+Postgres stores page metadata in `documents` and searchable content in `document_chunks`. Chunk embeddings use pgvector's `vector(768)` type, matching the output size of `BAAI/bge-base-en`.
 
 Search uses a hybrid ranking strategy:
 
 - semantic similarity via pgvector cosine distance
 - keyword relevance via PostgreSQL full-text search using `tsvector`, `websearch_to_tsquery`, and `ts_rank_cd`
 
-The current fixed ranking blend is `70%` semantic similarity and `30%` keyword relevance. The README setup below creates the table, the `match_documents(...)` helper function, an HNSW vector index, and a GIN full-text index.
+The current fixed ranking blend is `70%` semantic similarity and `30%` keyword relevance. Vector and full-text indexes independently retrieve bounded candidate sets; only their union is reranked. Runtime HNSW `ef_search`, iterative scan mode, and candidate counts are configured in `config/search.yml`.
 
 ### Yours-Truly: web search UI
 
@@ -160,9 +160,9 @@ uv run python eval/run_eval.py --queries eval/queries.json --k 1 5 10 --show-cas
 uv run python eval/run_eval.py --queries eval/queries.json --json-output eval/results.json
 ```
 
-### Current caveats
+### Search scaling benchmarks
 
-- The search API supports pagination, but the current web UI does not expose paging controls.
+`benchmark/` contains a synthetic corpus generator and an HNSW-versus-exact benchmark. See `benchmark/README.md` for the 100k, 1M, and 3M document workflow and the Recall@k/latency measurements.
 
 ## Components
 
@@ -266,10 +266,11 @@ tern migrate --migrations db/migrations --config db/tern.conf
 The migrations create:
 
 - the `vector` extension
-- the `documents` table
-- the `match_documents(...)` hybrid search function
-- the HNSW embedding index
-- the generated full-text `search_vector` column and GIN index
+- the `documents` and `document_chunks` tables
+- batched chunk metadata and embedding-model tracking
+- the bounded-candidate `match_documents(...)` hybrid search function
+- HNSW chunk-embedding and GIN full-text indexes
+- indexed random landing-page selection
 
 The local development defaults match the current application code:
 

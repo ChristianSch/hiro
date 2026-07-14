@@ -7,6 +7,15 @@ import (
 	"testing"
 )
 
+func TestSearchPathEncodesQueryAndPage(t *testing.T) {
+	if got := searchPath("/search", "vector search", 3); got != "/search?page=3&q=vector+search" {
+		t.Fatalf("unexpected search path: %q", got)
+	}
+	if got := searchPath("/search", "vector search", 1); got != "/search?q=vector+search" {
+		t.Fatalf("unexpected first-page search path: %q", got)
+	}
+}
+
 func TestAssetURLIncludesContentVersion(t *testing.T) {
 	staticDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(staticDir, "base.css"), []byte("body{}"), 0o600); err != nil {

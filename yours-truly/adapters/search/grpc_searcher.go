@@ -37,6 +37,13 @@ type SearchResult struct {
 	Description string
 }
 
+type SearchPage struct {
+	Results     []*SearchResult
+	PageNumber  int
+	HasPrevious bool
+	HasNext     bool
+}
+
 type ServiceStatus struct {
 	Operational  bool
 	Dependencies map[string]bool
@@ -104,11 +111,15 @@ func (s *GrpcSearcher) Status(ctx context.Context) (*ServiceStatus, error) {
 	return status, nil
 }
 
-func (s *GrpcSearcher) Search(ctx context.Context, query string) ([]*SearchResult, error) {
+func (s *GrpcSearcher) Search(ctx context.Context, query string, pageNumber, resultPerPage int) (*SearchPage, error) {
 	requestCtx, cancel := s.requestContext(ctx)
 	defer cancel()
-	zap.L().Info("searching via grpc")
-	r, err := s.client.Search(requestCtx, &pb.SearchRequest{Query: query})
+	zap.L().Info("searching via grpc", zap.Int("page", pageNumber))
+	r, err := s.client.Search(requestCtx, &pb.SearchRequest{
+		Query:         query,
+		PageNumber:    int32(pageNumber),
+		ResultPerPage: int32(resultPerPage),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -135,5 +146,14 @@ func (s *GrpcSearcher) Search(ctx context.Context, query string) ([]*SearchResul
 		}
 	}
 
-	return out, nil
+	page := int(r.PageNumber)
+	if page < 1 {
+		page = 1
+	}
+	return &SearchPage{
+		Results:     out,
+		PageNumber:  page,
+		HasPrevious: page > 1,
+		HasNext:     r.HasNext,
+	}, nil
 }

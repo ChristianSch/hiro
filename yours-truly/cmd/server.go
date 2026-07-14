@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -26,7 +27,11 @@ import (
 	"go.uber.org/zap"
 )
 
-const maxQueryBytes = 512
+const (
+	maxQueryBytes  = 512
+	searchPageSize = 10
+	randomPageSize = 5
+)
 
 func main() {
 	configDir := flag.String("config-dir", "../config", "directory containing global.yml and web.yml")
@@ -117,16 +122,25 @@ func main() {
 			if len([]byte(query)) > maxQueryBytes {
 				return fiber.NewError(fiber.StatusBadRequest, "query is too long")
 			}
-			results, err := searcher.Search(context.Background(), query)
+			pageNumber, err := strconv.Atoi(ctx.Query("page", "1"))
+			if err != nil || pageNumber < 1 || pageNumber > 100 {
+				return fiber.NewError(fiber.StatusBadRequest, "page must be between 1 and 100")
+			}
+			page, err := searcher.Search(context.Background(), query, pageNumber, searchPageSize)
 			if err != nil {
 				return fmt.Errorf("search backend: %w", err)
 			}
 			if pushHistory {
-				ctx.Set("Hx-Push", "/search?q="+url.QueryEscape(query))
+				ctx.Set("Hx-Push", searchPath("/search", query, page.PageNumber))
 			}
 			return ctx.Render("search", fiber.Map{
-				"results": results,
-				"query":   query,
+				"results":      page.Results,
+				"query":        query,
+				"page":         page,
+				"previousURL":  searchPath("/search", query, page.PageNumber-1),
+				"previousHTMX": searchPath("/htmx/search", query, page.PageNumber-1),
+				"nextURL":      searchPath("/search", query, page.PageNumber+1),
+				"nextHTMX":     searchPath("/htmx/search", query, page.PageNumber+1),
 			}, layout)
 		}
 	}
@@ -144,11 +158,11 @@ func main() {
 		return ctx.Render("status", fiber.Map{"operational": operational}, "layouts/empty")
 	})
 	htmx.Get("/random", searchLimiter, func(ctx *fiber.Ctx) error {
-		results, err := searcher.Search(context.Background(), "")
+		page, err := searcher.Search(context.Background(), "", 1, randomPageSize)
 		if err != nil {
-			return fmt.Errorf("load recent websites: %w", err)
+			return fmt.Errorf("load random websites: %w", err)
 		}
-		return ctx.Render("results", fiber.Map{"results": results}, "layouts/empty")
+		return ctx.Render("results", fiber.Map{"results": page.Results}, "layouts/empty")
 	})
 	htmx.Get("/search", searchLimiter, runSearch("layouts/empty", true))
 	app.Get("/search", searchLimiter, runSearch("layouts/main", false))
@@ -174,6 +188,14 @@ func main() {
 			logger.Error("graceful shutdown failed", zap.Error(err))
 		}
 	}
+}
+
+func searchPath(base, query string, page int) string {
+	values := url.Values{"q": []string{query}}
+	if page > 1 {
+		values.Set("page", strconv.Itoa(page))
+	}
+	return base + "?" + values.Encode()
 }
 
 func newAssetURL(staticDir string, publicPaths []string) (func(string) string, error) {

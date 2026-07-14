@@ -1,4 +1,6 @@
 import argparse
+import hashlib
+import threading
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -33,6 +35,7 @@ class EmbeddingServer(EmbeddingServiceServicer):
             settings.model_name,
             device=settings.model_device,
         )
+        self._inference_lock = threading.Lock()
         self._init_db()
 
     def _init_db(self):
@@ -51,17 +54,131 @@ class EmbeddingServer(EmbeddingServiceServicer):
             self._pool.close()
             logging.info('Database connection pool closed.')
 
-    def _embed(self, url, title, content, description):
-        embedding = self._model.encode(content)
+    def _chunk_content(self, content: str) -> list[str]:
+        token_ids = self._model.tokenizer.encode(content, add_special_tokens=False)
+        step = self._settings.chunk_max_tokens - self._settings.chunk_overlap_tokens
+        chunks = []
+        for start in range(0, len(token_ids), step):
+            chunk_ids = token_ids[start:start + self._settings.chunk_max_tokens]
+            if not chunk_ids:
+                break
+            chunk = self._model.tokenizer.decode(
+                chunk_ids,
+                skip_special_tokens=True,
+                clean_up_tokenization_spaces=True,
+            ).strip()
+            if chunk:
+                chunks.append(chunk)
+            if start + self._settings.chunk_max_tokens >= len(token_ids):
+                break
+        return chunks or [content]
+
+    def _document_is_current(
+        self,
+        url: str,
+        content_hash: str,
+        title: str,
+        description: str,
+        source_host: str,
+    ) -> bool:
+        with self._pool.connection() as connection:
+            with connection.cursor() as cur:
+                row = cur.execute(
+                    '''SELECT documents.id
+                       FROM documents
+                       WHERE documents.url = %s
+                         AND documents.content_hash = %s
+                         AND EXISTS (
+                           SELECT 1 FROM document_chunks
+                           WHERE document_chunks.document_id = documents.id
+                         )
+                         AND NOT EXISTS (
+                           SELECT 1 FROM document_chunks
+                           WHERE document_chunks.document_id = documents.id
+                             AND document_chunks.embedding_model <> %s
+                         )''',
+                    (url, content_hash, self._settings.model_name),
+                ).fetchone()
+                if row is None:
+                    return False
+                cur.execute(
+                    '''UPDATE documents
+                       SET title = %s,
+                           description = %s,
+                           content = null,
+                           source_host = %s,
+                           crawled_at = now(),
+                           updated_at = now()
+                       WHERE id = %s''',
+                    (title, description, source_host, row[0]),
+                )
+                return True
+
+    def _embed(self, url, title, content, description, source_host):
+        content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        if self._document_is_current(
+            url,
+            content_hash,
+            title,
+            description,
+            source_host,
+        ):
+            logging.info("Document unchanged; skipped embedding")
+            return
+
+        chunks = self._chunk_content(content)
+        with self._inference_lock:
+            embeddings = self._model.encode(
+                chunks,
+                batch_size=self._settings.embedding_batch_size,
+                normalize_embeddings=True,
+                show_progress_bar=False,
+            )
 
         with self._pool.connection() as connection:
             with connection.cursor() as cur:
+                document_id = cur.execute(
+                    '''INSERT INTO documents (
+                         url, title, content, description,
+                         source_host, content_hash, crawled_at, updated_at
+                       ) VALUES (%s, %s, null, %s, %s, %s, now(), now())
+                       ON CONFLICT (url) DO UPDATE SET
+                         title = EXCLUDED.title,
+                         content = null,
+                         description = EXCLUDED.description,
+                         source_host = EXCLUDED.source_host,
+                         content_hash = EXCLUDED.content_hash,
+                         crawled_at = now(),
+                         updated_at = now()
+                       RETURNING id''',
+                    (
+                        url,
+                        title,
+                        description,
+                        source_host,
+                        content_hash,
+                    ),
+                ).fetchone()[0]
                 cur.execute(
-                'INSERT INTO documents (url, title, content, description, embedding) VALUES (%(url)s, %(title)s, %(content)s, %(description)s, %(embedding)s) ' +
-                'ON CONFLICT (url) DO UPDATE SET (title, content, description, embedding) = (EXCLUDED.title, EXCLUDED.content, EXCLUDED.description, EXCLUDED.embedding)',
-                    {'url': url, 'title': title, 'content': content,
-                        'description': description, 'embedding': embedding, }
+                    "DELETE FROM document_chunks WHERE document_id = %s",
+                    (document_id,),
                 )
+                cur.executemany(
+                    '''INSERT INTO document_chunks (
+                         document_id, chunk_index, content, embedding, embedding_model
+                       ) VALUES (%s, %s, %s, %s, %s)''',
+                    [
+                        (
+                            document_id,
+                            index,
+                            chunk,
+                            embeddings[index],
+                            self._settings.model_name,
+                        )
+                        for index, chunk in enumerate(chunks)
+                    ],
+                )
+        logging.info("Embedded document into %d chunks", len(chunks))
 
     def Embed(self, request: EmbeddingRequest, context):
         require_authorization(context, self._settings.service_token)
@@ -86,6 +203,7 @@ class EmbeddingServer(EmbeddingServiceServicer):
                 request.title,
                 request.content,
                 request.description,
+                parsed_url.hostname.lower(),
             )
         except Exception:
             logging.exception("Embedding request failed")

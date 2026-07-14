@@ -27,6 +27,10 @@ server:
   reflection: false
 database:
   pool_size: 8
+chunking:
+  max_tokens: 384
+  overlap_tokens: 64
+  batch_size: 32
 """
 
 SEARCH_CONFIG = """
@@ -40,6 +44,12 @@ server:
   reflection: false
 database:
   pool_size: 8
+retrieval:
+  match_threshold: 0.78
+  vector_candidates: 200
+  text_candidates: 200
+  hnsw_ef_search: 200
+  hnsw_iterative_scan: relaxed_order
 """
 
 
@@ -61,6 +71,8 @@ class ServiceConfigurationTest(unittest.TestCase):
         self.assertEqual("postgresql://hiro@localhost/hiro", settings.database_url)
         self.assertEqual("shared-model", settings.model_name)
         self.assertEqual("127.0.0.1:50052", settings.listen_address)
+        self.assertEqual(384, settings.chunk_max_tokens)
+        self.assertEqual(64, settings.chunk_overlap_tokens)
 
     def test_search_configuration_merges_global_and_service_files(self):
         paths = self.write_configs("search", SEARCH_CONFIG)
@@ -69,6 +81,9 @@ class ServiceConfigurationTest(unittest.TestCase):
         self.assertEqual("postgresql://hiro@localhost/hiro", settings.database_url)
         self.assertEqual("shared-model", settings.model_name)
         self.assertEqual("127.0.0.1:50053", settings.listen_address)
+        self.assertEqual(0.78, settings.match_threshold)
+        self.assertEqual(200, settings.hnsw_ef_search)
+        self.assertEqual("relaxed_order", settings.hnsw_iterative_scan)
 
     def test_service_file_overrides_global_values(self):
         global_config = GLOBAL_CONFIG + "\nserver:\n  max_workers: 2\n"

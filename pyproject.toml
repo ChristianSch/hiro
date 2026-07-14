@@ -12,6 +12,7 @@ dependencies = [
   "grpcio==1.82.1",
   "grpcio-reflection==1.82.1",
   "grpcio-tools==1.82.1",
+  "numpy==2.4.6",
   "pandas==2.2.3",
   "pgvector==0.3.6",
   "pillow==12.3.0",
