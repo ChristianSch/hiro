@@ -4,7 +4,7 @@ from .reembed import prepared_contents
 
 
 class FakeTokenizer:
-    def encode(self, content, add_special_tokens=False):
+    def encode(self, content, add_special_tokens=False, verbose=True):
         return [int(value) for value in content.split()]
 
     def decode(

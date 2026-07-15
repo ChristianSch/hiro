@@ -7,7 +7,14 @@ def chunk_content(
     max_tokens: int,
     overlap_tokens: int,
 ) -> list[str]:
-    token_ids = tokenizer.encode(content, add_special_tokens=False)
+    # The complete token sequence is needed before splitting. Disable the
+    # tokenizer's model-length warning because only bounded chunks are encoded
+    # by the model.
+    token_ids = tokenizer.encode(
+        content,
+        add_special_tokens=False,
+        verbose=False,
+    )
     step = max_tokens - overlap_tokens
     chunks: list[str] = []
     for start in range(0, len(token_ids), step):
