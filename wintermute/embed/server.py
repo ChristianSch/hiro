@@ -15,6 +15,7 @@ from sentence_transformers import SentenceTransformer
 
 from .stubs.embedding_pb2_grpc import EmbeddingServiceServicer, add_EmbeddingServiceServicer_to_server
 from .stubs.embedding_pb2 import EmbeddingRequest, EmbeddingResponse, DESCRIPTOR
+from .chunking import chunk_content
 from .config import EmbeddingSettings
 from ..grpc_utils import add_server_port, require_authorization
 
@@ -53,25 +54,6 @@ class EmbeddingServer(EmbeddingServiceServicer):
         if self._pool is not None:
             self._pool.close()
             logging.info('Database connection pool closed.')
-
-    def _chunk_content(self, content: str) -> list[str]:
-        token_ids = self._model.tokenizer.encode(content, add_special_tokens=False)
-        step = self._settings.chunk_max_tokens - self._settings.chunk_overlap_tokens
-        chunks = []
-        for start in range(0, len(token_ids), step):
-            chunk_ids = token_ids[start:start + self._settings.chunk_max_tokens]
-            if not chunk_ids:
-                break
-            chunk = self._model.tokenizer.decode(
-                chunk_ids,
-                skip_special_tokens=True,
-                clean_up_tokenization_spaces=True,
-            ).strip()
-            if chunk:
-                chunks.append(chunk)
-            if start + self._settings.chunk_max_tokens >= len(token_ids):
-                break
-        return chunks or [content]
 
     def _document_is_current(
         self,
@@ -126,7 +108,12 @@ class EmbeddingServer(EmbeddingServiceServicer):
             logging.info("Document unchanged; skipped embedding")
             return
 
-        chunks = self._chunk_content(content)
+        chunks = chunk_content(
+            self._model.tokenizer,
+            content,
+            self._settings.chunk_max_tokens,
+            self._settings.chunk_overlap_tokens,
+        )
         with self._inference_lock:
             embeddings = self._model.encode(
                 chunks,

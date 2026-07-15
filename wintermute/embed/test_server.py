@@ -1,7 +1,5 @@
 import unittest
-from types import SimpleNamespace
-
-from .server import EmbeddingServer
+from .chunking import chunk_content
 
 
 class FakeTokenizer:
@@ -17,20 +15,14 @@ class FakeTokenizer:
         return " ".join(str(value) for value in token_ids)
 
 
-class EmbeddingServerChunkingTest(unittest.TestCase):
-    def make_server(self, max_tokens=4, overlap_tokens=1):
-        server = EmbeddingServer.__new__(EmbeddingServer)
-        server._settings = SimpleNamespace(
-            chunk_max_tokens=max_tokens,
-            chunk_overlap_tokens=overlap_tokens,
-        )
-        server._model = SimpleNamespace(tokenizer=FakeTokenizer())
-        return server
-
+class EmbeddingChunkingTest(unittest.TestCase):
     def test_chunks_content_with_overlap(self):
-        server = self.make_server()
-
-        chunks = server._chunk_content("0 1 2 3 4 5 6 7 8 9")
+        chunks = chunk_content(
+            FakeTokenizer(),
+            "0 1 2 3 4 5 6 7 8 9",
+            max_tokens=4,
+            overlap_tokens=1,
+        )
 
         self.assertEqual(
             ["0 1 2 3", "3 4 5 6", "6 7 8 9"],
@@ -38,9 +30,15 @@ class EmbeddingServerChunkingTest(unittest.TestCase):
         )
 
     def test_short_content_stays_in_one_chunk(self):
-        server = self.make_server()
-
-        self.assertEqual(["0 1 2"], server._chunk_content("0 1 2"))
+        self.assertEqual(
+            ["0 1 2"],
+            chunk_content(
+                FakeTokenizer(),
+                "0 1 2",
+                max_tokens=4,
+                overlap_tokens=1,
+            ),
+        )
 
 
 if __name__ == "__main__":

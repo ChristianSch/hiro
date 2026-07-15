@@ -75,6 +75,20 @@ Search uses a hybrid ranking strategy:
 
 The current fixed ranking blend is `70%` semantic similarity and `30%` keyword relevance. Vector and full-text indexes independently retrieve bounded candidate sets; only their union is reranked. Runtime HNSW `ef_search`, iterative scan mode, and candidate counts are configured in `config/search.yml`.
 
+### Batch re-embedding
+
+Use the batch tool when changing embedding models or upgrading legacy one-chunk documents. It processes a bounded number of documents per transaction and resumes naturally because current-model chunks are skipped.
+
+```bash
+# Inspect pending work without loading the model
+uv run python -m wintermute.embed.reembed --dry-run
+
+# Re-embed stale chunks, 50 documents at a time
+uv run python -m wintermute.embed.reembed --batch-documents 50
+```
+
+Legacy chunks created by migration `003` are split with the current overlap settings by default. Existing non-legacy chunk boundaries are preserved because the canonical full page text is not stored separately. Use `--force` to re-encode every document or `--no-rechunk-legacy` to preserve legacy chunks. Run one copy of the tool at a time; each completed batch is atomic.
+
 ### Yours-Truly: web search UI
 
 `yours-truly/` is a Go web application using Fiber, Go HTML templates, HTMX, and static CSS/JS. Its entry point is:
