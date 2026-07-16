@@ -66,7 +66,7 @@ It receives search queries using the service defined in `proto/search.proto`. Fo
 
 ### Postgres + pgvector: storage and retrieval
 
-Postgres stores page metadata in `documents` and searchable content in `document_chunks`. Chunk embeddings use pgvector's `vector(768)` type, matching the output size of `BAAI/bge-base-en`.
+Postgres stores page metadata in `documents` and searchable content in `document_chunks`. Chunk embeddings use pgvector's `halfvec(768)` type, cutting vector storage roughly in half while matching the 768-value output of `BAAI/bge-base-en`.
 
 Search uses a hybrid ranking strategy:
 

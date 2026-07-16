@@ -105,7 +105,7 @@ def main() -> int:
     if min(args.documents, args.chunks_per_document, args.batch_size) < 1:
         parser.error("documents, chunks-per-document, and batch-size must be positive")
     if args.dimensions != 768:
-        parser.error("dimensions must match the current vector(768) schema")
+        parser.error("dimensions must match the current 768-dimensional embedding schema")
 
     settings = SearchSettings.from_files(
         args.config_dir / "global.yml",
