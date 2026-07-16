@@ -4,7 +4,7 @@ Run database migration `003_chunked_hybrid_search.sql` before using these tools.
 
 ## Generate a corpus
 
-The generator writes synthetic documents and normalized 768-dimensional `halfvec` chunk embeddings. Use a dedicated benchmark database.
+The generator writes synthetic documents and normalized `halfvec` chunk embeddings using `model.dimensions` from the layered configuration. Use a dedicated benchmark database.
 
 ```bash
 uv run python -m benchmark.generate_corpus \

@@ -12,6 +12,7 @@ database:
 model:
   name: shared-model
   device: cpu
+  dimensions: 768
   allow_download: false
 logging:
   level: INFO
@@ -77,6 +78,7 @@ class ServiceConfigurationTest(unittest.TestCase):
 
         self.assertEqual("postgresql://hiro@localhost/hiro", settings.database_url)
         self.assertEqual("shared-model", settings.model_name)
+        self.assertEqual(768, settings.model_dimensions)
         self.assertFalse(settings.model_allow_download)
         self.assertEqual("127.0.0.1:50052", settings.listen_address)
         self.assertEqual(384, settings.chunk_max_tokens)
@@ -87,6 +89,7 @@ class ServiceConfigurationTest(unittest.TestCase):
         settings = SearchSettings.from_files(*paths)
 
         self.assertEqual("postgresql://hiro@localhost/hiro", settings.database_url)
+        self.assertEqual(768, settings.model_dimensions)
         self.assertEqual("127.0.0.1:50052", settings.embedding_address)
         self.assertEqual(5, settings.embedding_timeout_seconds)
         self.assertEqual("127.0.0.1:50053", settings.listen_address)

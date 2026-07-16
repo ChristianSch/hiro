@@ -252,7 +252,7 @@ Configuration lives entirely in YAML under `config/`:
 
 Each process loads `global.yml` first and merges its service file over it. Service values win when the same key exists in both files. Go services use Viper for merging and govalidator for validation; Python services apply the same merge order and validate their typed settings.
 
-Model loading always checks local files and the Hugging Face cache before allowing network access. Set `model.allow_download: false` in `config/global.yml` for strict offline operation; startup then fails clearly if the configured model is not available locally. Start the embedding service before the search service because search obtains query embeddings from it over gRPC.
+Model loading always checks local files and the Hugging Face cache before allowing network access. The shared `model.dimensions` value validates the loaded model, document embeddings, query responses, and benchmark corpus generation. It must match the pgvector dimension established by the database migration. Set `model.allow_download: false` in `config/global.yml` for strict offline operation; startup then fails clearly if the configured model is not available locally. Start the embedding service before the search service because search obtains query embeddings from it over gRPC.
 
 Python commands use `config/` by default. The Go commands are normally run from their module directories and therefore use `../config/` by default. Override either default with `--config-dir`:
 

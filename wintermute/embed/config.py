@@ -20,6 +20,7 @@ class EmbeddingSettings:
     database_url: str
     model_name: str
     model_device: str
+    model_dimensions: int
     model_allow_download: bool
     log_level: str
     listen_address: str
@@ -60,6 +61,7 @@ class EmbeddingSettings:
             database_url=required_string(database, "url"),
             model_name=required_string(model, "name"),
             model_device=required_string(model, "device"),
+            model_dimensions=positive_int(model, "dimensions"),
             model_allow_download=boolean(model, "allow_download"),
             log_level=required_string(logging, "level").upper(),
             listen_address=listen_address,

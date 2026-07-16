@@ -43,6 +43,7 @@ class EmbeddingServer(EmbeddingServiceServicer):
         self._model = load_embedding_model(
             settings.model_name,
             settings.model_device,
+            settings.model_dimensions,
             settings.model_allow_download,
         )
         self._inference_lock = threading.Lock()
@@ -190,9 +191,10 @@ class EmbeddingServer(EmbeddingServiceServicer):
                     normalize_embeddings=True,
                     show_progress_bar=False,
                 )
-                if len(embedding) != 768:
+                if len(embedding) != self._settings.model_dimensions:
                     raise RuntimeError(
-                        f"embedding model returned {len(embedding)} values; expected 768"
+                        f"embedding model returned {len(embedding)} values; "
+                        f"expected {self._settings.model_dimensions}"
                     )
         except Exception:
             logging.exception("Query embedding failed")
@@ -206,6 +208,7 @@ class EmbeddingServer(EmbeddingServiceServicer):
         return EmbeddingStatusResponse(
             ready=self._model is not None,
             model=self._settings.model_name,
+            dimensions=self._settings.model_dimensions,
         )
 
     def Embed(self, request: EmbeddingRequest, context):

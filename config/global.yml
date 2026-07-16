@@ -4,6 +4,7 @@ database:
 model:
   name: BAAI/bge-base-en
   device: cpu
+  dimensions: 768
   allow_download: true
 
 logging:

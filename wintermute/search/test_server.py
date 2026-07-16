@@ -73,7 +73,7 @@ class FakeEmbeddingClient:
 
     def embed_query(self, query):
         self.queries.append(query)
-        return [0.0] * 768
+        return [0.0] * 3
 
 
 class SearchServerStatusTest(unittest.TestCase):

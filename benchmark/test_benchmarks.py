@@ -11,7 +11,7 @@ class BenchmarkHelpersTest(unittest.TestCase):
         self.assertEqual(2.5, percentile([1.0, 2.0, 3.0, 4.0], 0.5))
 
     def test_generated_vectors_are_normalized(self):
-        vectors = normalized_vectors(np.random.default_rng(42), 4, 768)
+        vectors = normalized_vectors(np.random.default_rng(42), 4, 8)
         norms = np.linalg.norm(vectors, axis=1)
         np.testing.assert_allclose(norms, np.ones(4), rtol=1e-5)
 

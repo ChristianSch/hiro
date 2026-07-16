@@ -19,6 +19,7 @@ from ..configuration import (
 @dataclass(frozen=True)
 class SearchSettings:
     database_url: str
+    model_dimensions: int
     embedding_address: str
     embedding_token: str | None
     embedding_timeout_seconds: int
@@ -47,6 +48,7 @@ class SearchSettings:
     ) -> "SearchSettings":
         config = load_layered_config(global_path, service_path)
         database = section(config, "database")
+        model = section(config, "model")
         logging = section(config, "logging")
         server = section(config, "server")
         retrieval = section(config, "retrieval")
@@ -68,6 +70,7 @@ class SearchSettings:
         embedding_ca = optional_string(embedding_service, "tls_ca_certificate")
         return cls(
             database_url=required_string(database, "url"),
+            model_dimensions=positive_int(model, "dimensions"),
             embedding_address=required_string(embedding_service, "address"),
             embedding_token=optional_string(embedding_service, "token"),
             embedding_timeout_seconds=positive_int(embedding_service, "timeout_seconds"),

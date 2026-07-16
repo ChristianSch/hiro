@@ -32,6 +32,7 @@ class EmbeddingClient:
                 options=options,
             )
         self._stub = EmbeddingServiceStub(self._channel)
+        self._dimensions = settings.model_dimensions
         self._timeout = settings.embedding_timeout_seconds
         self._metadata = (
             (("authorization", f"Bearer {settings.embedding_token}"),)
@@ -48,9 +49,10 @@ class EmbeddingClient:
             timeout=self._timeout,
             metadata=self._metadata,
         )
-        if len(response.embedding) != 768:
+        if len(response.embedding) != self._dimensions:
             raise RuntimeError(
-                f"embedding service returned {len(response.embedding)} values; expected 768"
+                f"embedding service returned {len(response.embedding)} values; "
+                f"expected {self._dimensions}"
             )
         return list(response.embedding)
 
@@ -60,4 +62,4 @@ class EmbeddingClient:
             timeout=self._timeout,
             metadata=self._metadata,
         )
-        return response.ready
+        return response.ready and response.dimensions == self._dimensions

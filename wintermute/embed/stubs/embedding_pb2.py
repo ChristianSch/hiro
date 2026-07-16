@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0f\x65mbedding.proto\x12\x05\x65mbed\"T\n\x10\x45mbeddingRequest\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\r\n\x05title\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\"$\n\x11\x45mbeddingResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\"&\n\x15QueryEmbeddingRequest\x12\r\n\x05query\x18\x01 \x01(\t\"+\n\x16QueryEmbeddingResponse\x12\x11\n\tembedding\x18\x01 \x03(\x02\"\x18\n\x16\x45mbeddingStatusRequest\"7\n\x17\x45mbeddingStatusResponse\x12\r\n\x05ready\x18\x01 \x01(\x08\x12\r\n\x05model\x18\x02 \x01(\t2\xe8\x01\n\x10\x45mbeddingService\x12<\n\x05\x45mbed\x12\x17.embed.EmbeddingRequest\x1a\x18.embed.EmbeddingResponse\"\x00\x12K\n\nEmbedQuery\x12\x1c.embed.QueryEmbeddingRequest\x1a\x1d.embed.QueryEmbeddingResponse\"\x00\x12I\n\x06Status\x12\x1d.embed.EmbeddingStatusRequest\x1a\x1e.embed.EmbeddingStatusResponse\"\x00\x42\x17Z\x15./adapters/embed/grpcb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0f\x65mbedding.proto\x12\x05\x65mbed\"T\n\x10\x45mbeddingRequest\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\r\n\x05title\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\"$\n\x11\x45mbeddingResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\"&\n\x15QueryEmbeddingRequest\x12\r\n\x05query\x18\x01 \x01(\t\"+\n\x16QueryEmbeddingResponse\x12\x11\n\tembedding\x18\x01 \x03(\x02\"\x18\n\x16\x45mbeddingStatusRequest\"K\n\x17\x45mbeddingStatusResponse\x12\r\n\x05ready\x18\x01 \x01(\x08\x12\r\n\x05model\x18\x02 \x01(\t\x12\x12\n\ndimensions\x18\x03 \x01(\r2\xe8\x01\n\x10\x45mbeddingService\x12<\n\x05\x45mbed\x12\x17.embed.EmbeddingRequest\x1a\x18.embed.EmbeddingResponse\"\x00\x12K\n\nEmbedQuery\x12\x1c.embed.QueryEmbeddingRequest\x1a\x1d.embed.QueryEmbeddingResponse\"\x00\x12I\n\x06Status\x12\x1d.embed.EmbeddingStatusRequest\x1a\x1e.embed.EmbeddingStatusResponse\"\x00\x42\x17Z\x15./adapters/embed/grpcb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -43,7 +43,7 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_EMBEDDINGSTATUSREQUEST']._serialized_start=235
   _globals['_EMBEDDINGSTATUSREQUEST']._serialized_end=259
   _globals['_EMBEDDINGSTATUSRESPONSE']._serialized_start=261
-  _globals['_EMBEDDINGSTATUSRESPONSE']._serialized_end=316
-  _globals['_EMBEDDINGSERVICE']._serialized_start=319
-  _globals['_EMBEDDINGSERVICE']._serialized_end=551
+  _globals['_EMBEDDINGSTATUSRESPONSE']._serialized_end=336
+  _globals['_EMBEDDINGSERVICE']._serialized_start=339
+  _globals['_EMBEDDINGSERVICE']._serialized_end=571
 # @@protoc_insertion_point(module_scope)

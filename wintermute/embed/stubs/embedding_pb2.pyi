@@ -41,9 +41,11 @@ class EmbeddingStatusRequest(_message.Message):
     def __init__(self) -> None: ...
 
 class EmbeddingStatusResponse(_message.Message):
-    __slots__ = ("ready", "model")
+    __slots__ = ("ready", "model", "dimensions")
     READY_FIELD_NUMBER: _ClassVar[int]
     MODEL_FIELD_NUMBER: _ClassVar[int]
+    DIMENSIONS_FIELD_NUMBER: _ClassVar[int]
     ready: bool
     model: str
-    def __init__(self, ready: _Optional[bool] = ..., model: _Optional[str] = ...) -> None: ...
+    dimensions: int
+    def __init__(self, ready: _Optional[bool] = ..., model: _Optional[str] = ..., dimensions: _Optional[int] = ...) -> None: ...

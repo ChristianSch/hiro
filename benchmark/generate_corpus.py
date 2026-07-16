@@ -98,15 +98,11 @@ def main() -> int:
     parser.add_argument("--documents", type=int, required=True)
     parser.add_argument("--chunks-per-document", type=int, default=5)
     parser.add_argument("--batch-size", type=int, default=1_000)
-    parser.add_argument("--dimensions", type=int, default=768)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--replace", action="store_true")
     args = parser.parse_args()
     if min(args.documents, args.chunks_per_document, args.batch_size) < 1:
         parser.error("documents, chunks-per-document, and batch-size must be positive")
-    if args.dimensions != 768:
-        parser.error("dimensions must match the current 768-dimensional embedding schema")
-
     settings = SearchSettings.from_files(
         args.config_dir / "global.yml",
         args.config_dir / "search.yml",
@@ -131,7 +127,7 @@ def main() -> int:
                 start_id + inserted,
                 count,
                 args.chunks_per_document,
-                args.dimensions,
+                settings.model_dimensions,
                 args.seed + inserted,
             )
             inserted += count

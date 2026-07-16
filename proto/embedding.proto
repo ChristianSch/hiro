@@ -28,6 +28,7 @@ message EmbeddingStatusRequest {}
 message EmbeddingStatusResponse {
     bool ready = 1;
     string model = 2;
+    uint32 dimensions = 3;
 }
 
 service EmbeddingService {

@@ -74,6 +74,7 @@ def run(
         model = load_embedding_model(
             settings.model_name,
             settings.model_device,
+            settings.model_dimensions,
             settings.model_allow_download,
         )
         cursor = 0
