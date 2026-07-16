@@ -12,6 +12,7 @@ database:
 model:
   name: shared-model
   device: cpu
+  allow_download: false
 logging:
   level: INFO
 """
@@ -44,6 +45,12 @@ server:
   reflection: false
 database:
   pool_size: 8
+embedding_service:
+  address: 127.0.0.1:50052
+  token: ""
+  timeout_seconds: 5
+  tls_ca_certificate: ""
+  server_name: ""
 retrieval:
   match_threshold: 0.78
   vector_candidates: 200
@@ -70,6 +77,7 @@ class ServiceConfigurationTest(unittest.TestCase):
 
         self.assertEqual("postgresql://hiro@localhost/hiro", settings.database_url)
         self.assertEqual("shared-model", settings.model_name)
+        self.assertFalse(settings.model_allow_download)
         self.assertEqual("127.0.0.1:50052", settings.listen_address)
         self.assertEqual(384, settings.chunk_max_tokens)
         self.assertEqual(64, settings.chunk_overlap_tokens)
@@ -79,7 +87,8 @@ class ServiceConfigurationTest(unittest.TestCase):
         settings = SearchSettings.from_files(*paths)
 
         self.assertEqual("postgresql://hiro@localhost/hiro", settings.database_url)
-        self.assertEqual("shared-model", settings.model_name)
+        self.assertEqual("127.0.0.1:50052", settings.embedding_address)
+        self.assertEqual(5, settings.embedding_timeout_seconds)
         self.assertEqual("127.0.0.1:50053", settings.listen_address)
         self.assertEqual(0.78, settings.match_threshold)
         self.assertEqual(200, settings.hnsw_ef_search)

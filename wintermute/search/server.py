@@ -1,5 +1,4 @@
 import argparse
-import threading
 from functools import lru_cache
 from pathlib import Path
 
@@ -12,7 +11,6 @@ from contextlib import contextmanager
 
 from psycopg_pool import ConnectionPool
 from pgvector.psycopg import register_vector
-from sentence_transformers import SentenceTransformer
 
 from .stubs.search_pb2_grpc import SearchServiceServicer, add_SearchServiceServicer_to_server
 from .stubs.search_pb2 import (
@@ -26,6 +24,7 @@ from .stubs.search_pb2 import (
     StatusResponse,
 )
 from .config import SearchSettings
+from .embedding_client import EmbeddingClient
 from ..grpc_utils import add_server_port, require_authorization
 
 
@@ -34,18 +33,17 @@ def _configure_connection(connection) -> None:
 
 
 class SearchServer(SearchServiceServicer):
-    _model = None
     _pool = None
 
     def __init__(self, settings: SearchSettings) -> None:
         super().__init__()
         self._settings = settings
-        self._model = SentenceTransformer(
-            settings.model_name,
-            device=settings.model_device,
-        )
-        self._inference_lock = threading.Lock()
-        self._init_db()
+        self._embedding_client = EmbeddingClient(settings)
+        try:
+            self._init_db()
+        except Exception:
+            self._embedding_client.close()
+            raise
 
     def _init_db(self):
         self._pool = ConnectionPool(
@@ -69,14 +67,14 @@ class SearchServer(SearchServiceServicer):
         yield self._conn
 
     def close(self) -> None:
+        self._embedding_client.close()
         if self._pool is not None:
             self._pool.close()
             logging.info('Database connection pool closed.')
 
     @lru_cache(maxsize=1_024)
     def _encode_query(self, query: str):
-        with self._inference_lock:
-            return self._model.encode(query, normalize_embeddings=True)
+        return self._embedding_client.embed_query(query)
 
     def Status(self, request: StatusRequest, context):
         require_authorization(
@@ -94,9 +92,15 @@ class SearchServer(SearchServiceServicer):
         except Exception:
             logging.warning('PostgreSQL readiness check failed', exc_info=1)
 
-        model_is_ready = self._model is not None
+        embedding_state = OPERATIONAL_STATE_UNAVAILABLE
+        try:
+            if self._embedding_client.ready():
+                embedding_state = OPERATIONAL_STATE_OPERATIONAL
+        except grpc.RpcError:
+            logging.warning('Embedding service readiness check failed', exc_info=1)
+
         is_operational = (
-            model_is_ready
+            embedding_state == OPERATIONAL_STATE_OPERATIONAL
             and database_state == OPERATIONAL_STATE_OPERATIONAL
         )
 
@@ -107,10 +111,10 @@ class SearchServer(SearchServiceServicer):
                 if is_operational
                 else OPERATIONAL_STATE_UNAVAILABLE
             ),
-            dependencies=[DependencyStatus(
-                name='postgresql',
-                state=database_state,
-            )],
+            dependencies=[
+                DependencyStatus(name='postgresql', state=database_state),
+                DependencyStatus(name='embedding_service', state=embedding_state),
+            ],
         )
 
     def Search(self, request: SearchRequest, context):
@@ -206,6 +210,9 @@ class SearchServer(SearchServiceServicer):
                 has_next=has_next,
             )
 
+        except grpc.RpcError:
+            logging.exception('Embedding service request failed')
+            context.abort(grpc.StatusCode.UNAVAILABLE, 'embedding service unavailable')
         except Exception:
             logging.exception('Search request failed')
             context.abort(grpc.StatusCode.INTERNAL, 'search request failed')

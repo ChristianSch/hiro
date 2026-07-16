@@ -63,11 +63,24 @@ class FakeContext:
         self.code = code
 
 
+class FakeEmbeddingClient:
+    def __init__(self, ready=True):
+        self.is_ready = ready
+        self.queries = []
+
+    def ready(self):
+        return self.is_ready
+
+    def embed_query(self, query):
+        self.queries.append(query)
+        return [0.0] * 768
+
+
 class SearchServerStatusTest(unittest.TestCase):
-    def make_server(self, connection, model=object()):
+    def make_server(self, connection, embedding_ready=True):
         server = SearchServer.__new__(SearchServer)
         server._conn = connection
-        server._model = model
+        server._embedding_client = FakeEmbeddingClient(embedding_ready)
         server._settings = SimpleNamespace(
             service_token=None,
             match_threshold=0.78,
@@ -86,7 +99,7 @@ class SearchServerStatusTest(unittest.TestCase):
 
         self.assertEqual(OPERATIONAL_STATE_OPERATIONAL, response.state)
         self.assertEqual(grpc.StatusCode.OK, context.code)
-        self.assertEqual(1, len(response.dependencies))
+        self.assertEqual(2, len(response.dependencies))
         self.assertEqual('postgresql', response.dependencies[0].name)
         self.assertEqual(
             OPERATIONAL_STATE_OPERATIONAL,
@@ -123,8 +136,6 @@ class SearchServerStatusTest(unittest.TestCase):
         ]
         connection = FakeConnection(rows=rows)
         server = self.make_server(connection)
-        server._encode_query = lambda query: [0.0] * 768
-
         response = server.Search(
             SearchRequest(query="example", page_number=2, result_per_page=2),
             FakeContext(),
@@ -137,16 +148,17 @@ class SearchServerStatusTest(unittest.TestCase):
         self.assertEqual(0.78, connection.last_cursor.parameters[2])
         self.assertEqual(2, connection.last_cursor.parameters[3])
         self.assertEqual(3, connection.last_cursor.parameters[4])
+        self.assertEqual(["example"], server._embedding_client.queries)
 
-    def test_reports_unavailable_when_model_is_not_loaded(self):
-        server = self.make_server(FakeConnection(), model=None)
+    def test_reports_unavailable_when_embedding_service_is_not_ready(self):
+        server = self.make_server(FakeConnection(), embedding_ready=False)
 
         response = server.Status(StatusRequest(), FakeContext())
 
         self.assertEqual(OPERATIONAL_STATE_UNAVAILABLE, response.state)
         self.assertEqual(
-            OPERATIONAL_STATE_OPERATIONAL,
-            response.dependencies[0].state,
+            OPERATIONAL_STATE_UNAVAILABLE,
+            response.dependencies[1].state,
         )
 
 

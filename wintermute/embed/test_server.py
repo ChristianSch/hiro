@@ -1,9 +1,16 @@
+import threading
 import unittest
 from types import SimpleNamespace
 
+import numpy as np
+
 from .chunking import chunk_content
 from .server import EmbeddingServer
-from .stubs.embedding_pb2 import EmbeddingRequest
+from .stubs.embedding_pb2 import (
+    EmbeddingRequest,
+    EmbeddingStatusRequest,
+    QueryEmbeddingRequest,
+)
 
 
 class FakeTokenizer:
@@ -22,6 +29,13 @@ class FakeTokenizer:
 class FakeContext:
     def abort(self, code, details):
         raise AssertionError(details)
+
+
+class FakeModel:
+    def encode(self, query, **kwargs):
+        embedding = np.zeros(768, dtype=np.float32)
+        embedding[:2] = [0.5, -0.5]
+        return embedding
 
 
 class EmbeddingRequestTest(unittest.TestCase):
@@ -43,6 +57,30 @@ class EmbeddingRequestTest(unittest.TestCase):
 
         self.assertEqual("https://example.com/", received[0][0])
         self.assertEqual("example.com", received[0][4])
+
+    def test_embeds_query_with_shared_model(self):
+        server = EmbeddingServer.__new__(EmbeddingServer)
+        server._settings = SimpleNamespace(service_token=None, model_name="shared-model")
+        server._model = FakeModel()
+        server._inference_lock = threading.Lock()
+
+        response = server.EmbedQuery(
+            QueryEmbeddingRequest(query="semantic search"),
+            FakeContext(),
+        )
+
+        self.assertEqual(768, len(response.embedding))
+        self.assertEqual([0.5, -0.5], list(response.embedding[:2]))
+
+    def test_reports_model_readiness(self):
+        server = EmbeddingServer.__new__(EmbeddingServer)
+        server._settings = SimpleNamespace(service_token=None, model_name="shared-model")
+        server._model = FakeModel()
+
+        response = server.Status(EmbeddingStatusRequest(), FakeContext())
+
+        self.assertTrue(response.ready)
+        self.assertEqual("shared-model", response.model)
 
 
 class EmbeddingChunkingTest(unittest.TestCase):

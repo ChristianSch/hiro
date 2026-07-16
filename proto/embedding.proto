@@ -15,7 +15,26 @@ message EmbeddingResponse {
     bool success = 1;
 }
 
+message QueryEmbeddingRequest {
+    string query = 1;
+}
+
+message QueryEmbeddingResponse {
+    repeated float embedding = 1;
+}
+
+message EmbeddingStatusRequest {}
+
+message EmbeddingStatusResponse {
+    bool ready = 1;
+    string model = 2;
+}
+
 service EmbeddingService {
-    // Creates an embedding for the given text.
+    // Chunks, embeds, and stores a crawled document.
     rpc Embed (EmbeddingRequest) returns (EmbeddingResponse) {}
+    // Embeds a search query with the same model used for documents.
+    rpc EmbedQuery (QueryEmbeddingRequest) returns (QueryEmbeddingResponse) {}
+    // Reports whether model inference is ready.
+    rpc Status (EmbeddingStatusRequest) returns (EmbeddingStatusResponse) {}
 }

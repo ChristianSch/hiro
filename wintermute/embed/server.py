@@ -11,13 +11,20 @@ import logging
 
 from psycopg_pool import ConnectionPool
 from pgvector.psycopg import register_vector
-from sentence_transformers import SentenceTransformer
-
 from .stubs.embedding_pb2_grpc import EmbeddingServiceServicer, add_EmbeddingServiceServicer_to_server
-from .stubs.embedding_pb2 import EmbeddingRequest, EmbeddingResponse, DESCRIPTOR
+from .stubs.embedding_pb2 import (
+    DESCRIPTOR,
+    EmbeddingRequest,
+    EmbeddingResponse,
+    EmbeddingStatusRequest,
+    EmbeddingStatusResponse,
+    QueryEmbeddingRequest,
+    QueryEmbeddingResponse,
+)
 from .chunking import chunk_content
 from .config import EmbeddingSettings
 from ..grpc_utils import add_server_port, require_authorization
+from ..model import load_embedding_model
 from ..url_utils import canonicalize_url
 
 
@@ -33,9 +40,10 @@ class EmbeddingServer(EmbeddingServiceServicer):
     def __init__(self, settings: EmbeddingSettings) -> None:
         super().__init__()
         self._settings = settings
-        self._model = SentenceTransformer(
+        self._model = load_embedding_model(
             settings.model_name,
-            device=settings.model_device,
+            settings.model_device,
+            settings.model_allow_download,
         )
         self._inference_lock = threading.Lock()
         self._init_db()
@@ -167,6 +175,38 @@ class EmbeddingServer(EmbeddingServiceServicer):
                     ],
                 )
         logging.info("Embedded document into %d chunks", len(chunks))
+
+    def EmbedQuery(self, request: QueryEmbeddingRequest, context):
+        require_authorization(context, self._settings.service_token)
+        query = request.query.strip()
+        if not query:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "query is required")
+        if len(query) > 512:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "query is too long")
+        try:
+            with self._inference_lock:
+                embedding = self._model.encode(
+                    query,
+                    normalize_embeddings=True,
+                    show_progress_bar=False,
+                )
+                if len(embedding) != 768:
+                    raise RuntimeError(
+                        f"embedding model returned {len(embedding)} values; expected 768"
+                    )
+        except Exception:
+            logging.exception("Query embedding failed")
+            context.abort(grpc.StatusCode.INTERNAL, "query embedding failed")
+        return QueryEmbeddingResponse(
+            embedding=[float(value) for value in embedding],
+        )
+
+    def Status(self, request: EmbeddingStatusRequest, context):
+        require_authorization(context, self._settings.service_token)
+        return EmbeddingStatusResponse(
+            ready=self._model is not None,
+            model=self._settings.model_name,
+        )
 
     def Embed(self, request: EmbeddingRequest, context):
         require_authorization(context, self._settings.service_token)

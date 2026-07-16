@@ -19,8 +19,11 @@ from ..configuration import (
 @dataclass(frozen=True)
 class SearchSettings:
     database_url: str
-    model_name: str
-    model_device: str
+    embedding_address: str
+    embedding_token: str | None
+    embedding_timeout_seconds: int
+    embedding_tls_ca_certificate: Path | None
+    embedding_server_name: str | None
     log_level: str
     listen_address: str
     service_token: str | None
@@ -44,10 +47,10 @@ class SearchSettings:
     ) -> "SearchSettings":
         config = load_layered_config(global_path, service_path)
         database = section(config, "database")
-        model = section(config, "model")
         logging = section(config, "logging")
         server = section(config, "server")
         retrieval = section(config, "retrieval")
+        embedding_service = section(config, "embedding_service")
 
         listen_address = required_string(server, "address")
         service_token = optional_string(server, "token")
@@ -62,10 +65,14 @@ class SearchSettings:
                 "retrieval.hnsw_iterative_scan must be off, strict_order, or relaxed_order"
             )
 
+        embedding_ca = optional_string(embedding_service, "tls_ca_certificate")
         return cls(
             database_url=required_string(database, "url"),
-            model_name=required_string(model, "name"),
-            model_device=required_string(model, "device"),
+            embedding_address=required_string(embedding_service, "address"),
+            embedding_token=optional_string(embedding_service, "token"),
+            embedding_timeout_seconds=positive_int(embedding_service, "timeout_seconds"),
+            embedding_tls_ca_certificate=Path(embedding_ca) if embedding_ca else None,
+            embedding_server_name=optional_string(embedding_service, "server_name"),
             log_level=required_string(logging, "level").upper(),
             listen_address=listen_address,
             service_token=service_token,

@@ -10,6 +10,13 @@ server:
 database:
   pool_size: 8
 
+embedding_service:
+  address: 127.0.0.1:50052
+  token: ""
+  timeout_seconds: 5
+  tls_ca_certificate: ""
+  server_name: ""
+
 retrieval:
   match_threshold: 0.78
   vector_candidates: 200

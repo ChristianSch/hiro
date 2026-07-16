@@ -4,6 +4,7 @@ database:
 model:
   name: BAAI/bge-base-en
   device: cpu
+  allow_download: true
 
 logging:
   level: INFO

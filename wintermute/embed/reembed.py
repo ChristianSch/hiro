@@ -10,10 +10,9 @@ from pathlib import Path
 
 import psycopg
 from pgvector.psycopg import register_vector
-from sentence_transformers import SentenceTransformer
-
 from .chunking import chunk_content
 from .config import EmbeddingSettings
+from ..model import load_embedding_model
 
 
 def prepared_contents(
@@ -72,9 +71,10 @@ def run(
             return 0, 0
 
         print(f"model={settings.model_name}")
-        model = SentenceTransformer(
+        model = load_embedding_model(
             settings.model_name,
-            device=settings.model_device,
+            settings.model_device,
+            settings.model_allow_download,
         )
         cursor = 0
         processed_documents = 0

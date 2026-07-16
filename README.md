@@ -54,7 +54,7 @@ The embedding service is implemented in:
 wintermute/embed/server.py
 ```
 
-It receives crawled pages using the service defined in `proto/embedding.proto`, splits each page into overlapping token chunks, embeds chunks in batches, and atomically replaces the document's searchable chunks in Postgres. Unchanged content with current-model embeddings is not re-embedded.
+It owns the single `BAAI/bge-base-en` model instance. Over gRPC it embeds search queries and receives crawled pages, splits pages into overlapping token chunks, embeds chunks in batches, and atomically replaces searchable chunks in Postgres. Unchanged content with current-model embeddings is not re-embedded.
 
 The search service is implemented in:
 
@@ -62,7 +62,7 @@ The search service is implemented in:
 wintermute/search/server.py
 ```
 
-It receives search queries using the service defined in `proto/search.proto`. For each query, it creates an embedding with the same model, calls the Postgres `match_documents(...)` function, and returns the highest-ranked hybrid matches.
+It receives search queries using the service defined in `proto/search.proto`. For each uncached query, it requests an embedding from the embedding service over gRPC, calls the Postgres `match_documents(...)` function, and returns the highest-ranked hybrid matches. The search process does not load model weights.
 
 ### Postgres + pgvector: storage and retrieval
 
@@ -251,6 +251,8 @@ Configuration lives entirely in YAML under `config/`:
 - `embed.yml`, `search.yml`, `crawler.yml`, and `web.yml` contain service-owned settings.
 
 Each process loads `global.yml` first and merges its service file over it. Service values win when the same key exists in both files. Go services use Viper for merging and govalidator for validation; Python services apply the same merge order and validate their typed settings.
+
+Model loading always checks local files and the Hugging Face cache before allowing network access. Set `model.allow_download: false` in `config/global.yml` for strict offline operation; startup then fails clearly if the configured model is not available locally. Start the embedding service before the search service because search obtains query embeddings from it over gRPC.
 
 Python commands use `config/` by default. The Go commands are normally run from their module directories and therefore use `../config/` by default. Override either default with `--config-dir`:
 
