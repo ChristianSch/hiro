@@ -34,7 +34,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from statistics import mean
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
 
 import grpc
 
@@ -42,6 +41,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from wintermute.search.stubs.search_pb2 import SearchRequest  # noqa: E402
+from wintermute.url_utils import canonicalize_url  # noqa: E402
 from wintermute.search.stubs.search_pb2_grpc import SearchServiceStub  # noqa: E402
 
 
@@ -53,11 +53,7 @@ class QueryCase:
 
 def normalize_url(url: str) -> str:
     """Normalize URLs for matching eval labels to returned results."""
-    parts = urlsplit(url.strip())
-    scheme = parts.scheme.lower()
-    netloc = parts.netloc.lower()
-    path = parts.path.rstrip("/") or "/"
-    return urlunsplit((scheme, netloc, path, parts.query, ""))
+    return canonicalize_url(url)
 
 
 def load_cases(path: Path) -> list[QueryCase]:

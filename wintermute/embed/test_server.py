@@ -1,5 +1,9 @@
 import unittest
+from types import SimpleNamespace
+
 from .chunking import chunk_content
+from .server import EmbeddingServer
+from .stubs.embedding_pb2 import EmbeddingRequest
 
 
 class FakeTokenizer:
@@ -13,6 +17,32 @@ class FakeTokenizer:
         clean_up_tokenization_spaces=True,
     ):
         return " ".join(str(value) for value in token_ids)
+
+
+class FakeContext:
+    def abort(self, code, details):
+        raise AssertionError(details)
+
+
+class EmbeddingRequestTest(unittest.TestCase):
+    def test_canonicalizes_url_before_embedding(self):
+        server = EmbeddingServer.__new__(EmbeddingServer)
+        server._settings = SimpleNamespace(service_token=None)
+        received = []
+        server._embed = lambda *arguments: received.append(arguments)
+
+        server.Embed(
+            EmbeddingRequest(
+                url="HTTPS://EXAMPLE.COM",
+                title="Example",
+                content="content",
+                description="description",
+            ),
+            FakeContext(),
+        )
+
+        self.assertEqual("https://example.com/", received[0][0])
+        self.assertEqual("example.com", received[0][4])
 
 
 class EmbeddingChunkingTest(unittest.TestCase):

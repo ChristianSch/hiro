@@ -89,6 +89,17 @@ uv run python -m wintermute.embed.reembed --batch-documents 50
 
 Legacy chunks created by migration `003` are split with the current overlap settings by default. Existing non-legacy chunk boundaries are preserved because the canonical full page text is not stored separately. Use `--force` to re-encode every document or `--no-rechunk-legacy` to preserve legacy chunks. Run one copy of the tool at a time; each completed batch is atomic.
 
+### URL canonicalization
+
+Newly crawled URLs are canonicalized before storage so differences in host casing, fragments, default ports, or trailing slashes do not create duplicate documents. Normalize an existing corpus with a dry run followed by an explicit apply:
+
+```bash
+uv run python -m wintermute.normalize_urls
+uv run python -m wintermute.normalize_urls --apply
+```
+
+When equivalent documents already exist, the tool keeps the document with the most chunks (then the newest document), and cascade-deletes the duplicates in one locked transaction.
+
 ### Yours-Truly: web search UI
 
 `yours-truly/` is a Go web application using Fiber, Go HTML templates, HTMX, and static CSS/JS. Its entry point is:

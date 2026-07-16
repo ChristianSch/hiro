@@ -18,6 +18,7 @@ from .stubs.embedding_pb2 import EmbeddingRequest, EmbeddingResponse, DESCRIPTOR
 from .chunking import chunk_content
 from .config import EmbeddingSettings
 from ..grpc_utils import add_server_port, require_authorization
+from ..url_utils import canonicalize_url
 
 
 def _configure_connection(connection) -> None:
@@ -176,9 +177,11 @@ class EmbeddingServer(EmbeddingServiceServicer):
             )
         if len(request.url) > 2_048:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "url is too long")
-        parsed_url = urlsplit(request.url)
-        if parsed_url.scheme not in {"http", "https"} or not parsed_url.hostname:
+        try:
+            canonical_url = canonicalize_url(request.url)
+        except ValueError:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "url must be HTTP or HTTPS")
+        parsed_url = urlsplit(canonical_url)
         if len(request.title) > 1_000 or len(request.description) > 4_000:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "document metadata is too long")
         if len(request.content.encode("utf-8")) > 900_000:
@@ -186,7 +189,7 @@ class EmbeddingServer(EmbeddingServiceServicer):
 
         try:
             self._embed(
-                request.url,
+                canonical_url,
                 request.title,
                 request.content,
                 request.description,
