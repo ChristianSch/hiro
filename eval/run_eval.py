@@ -161,6 +161,11 @@ def evaluate_case(stub: SearchServiceStub, case: QueryCase, args: argparse.Names
     return metrics
 
 
+def write_results(path: Path, case_metrics: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"cases": case_metrics}, indent=2))
+
+
 def print_summary(case_metrics: list[dict[str, Any]], ks: list[int]) -> None:
     print(f"Queries evaluated: {len(case_metrics)}")
     print(f"MRR: {mean(m['mrr'] for m in case_metrics):.4f}")
@@ -197,7 +202,7 @@ def main() -> int:
             print(json.dumps(metrics, indent=2))
 
     if args.json_output:
-        args.json_output.write_text(json.dumps({"cases": case_metrics}, indent=2))
+        write_results(args.json_output, case_metrics)
         print(f"\nWrote {args.json_output}")
 
     return 0
