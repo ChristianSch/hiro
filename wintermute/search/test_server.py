@@ -145,6 +145,7 @@ class SearchServerStatusTest(unittest.TestCase):
         self.assertTrue(response.has_next)
         self.assertEqual(2, len(response.results))
         self.assertIn("match_documents", connection.last_cursor.query)
+        self.assertIn("%s::vector", connection.last_cursor.query)
         self.assertEqual(0.78, connection.last_cursor.parameters[2])
         self.assertEqual(2, connection.last_cursor.parameters[3])
         self.assertEqual(3, connection.last_cursor.parameters[4])

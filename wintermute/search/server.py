@@ -172,7 +172,7 @@ class SearchServer(SearchServiceServicer):
                             )
                             res = cur.execute(
                                 '''SELECT * FROM match_documents(
-                                     %s, %s, %s, %s, %s, %s, %s
+                                     %s::vector, %s, %s, %s, %s, %s, %s
                                    )''',
                                 (
                                     search,

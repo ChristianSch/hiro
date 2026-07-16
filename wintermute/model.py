@@ -40,7 +40,7 @@ def _validate_dimensions(
     model_name: str,
     expected: int,
 ) -> SentenceTransformer:
-    actual = model.get_sentence_embedding_dimension()
+    actual = model.get_embedding_dimension()
     if actual != expected:
         raise RuntimeError(
             f"embedding model {model_name!r} produces {actual} values; configured dimensions is {expected}"

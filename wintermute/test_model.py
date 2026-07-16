@@ -8,7 +8,7 @@ class FakeModel:
     def __init__(self, dimensions=3):
         self.dimensions = dimensions
 
-    def get_sentence_embedding_dimension(self):
+    def get_embedding_dimension(self):
         return self.dimensions
 
 

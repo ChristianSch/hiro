@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import grpc
+import numpy as np
 
 from ..embed.stubs.embedding_pb2 import (
     EmbeddingStatusRequest,
@@ -43,7 +44,7 @@ class EmbeddingClient:
     def close(self) -> None:
         self._channel.close()
 
-    def embed_query(self, query: str) -> list[float]:
+    def embed_query(self, query: str) -> np.ndarray:
         response = self._stub.EmbedQuery(
             QueryEmbeddingRequest(query=query),
             timeout=self._timeout,
@@ -54,7 +55,7 @@ class EmbeddingClient:
                 f"embedding service returned {len(response.embedding)} values; "
                 f"expected {self._dimensions}"
             )
-        return list(response.embedding)
+        return np.asarray(response.embedding, dtype=np.float32)
 
     def ready(self) -> bool:
         response = self._stub.Status(
