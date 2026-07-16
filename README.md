@@ -122,10 +122,11 @@ A small evaluation harness lives in:
 
 ```text
 eval/run_eval.py
+eval/queries.json
 eval/queries.example.json
 ```
 
-It measures search quality against a labeled set of queries. Create `eval/queries.json` with either binary relevance:
+`eval/queries.json` is a versioned bootstrap set built from the current corpus. It contains natural-language known-item queries and real relevant URLs; review and expand its labels as the corpus grows. The harness accepts either binary relevance:
 
 ```json
 [

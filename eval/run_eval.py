@@ -93,6 +93,16 @@ def load_cases(path: Path) -> list[QueryCase]:
     return cases
 
 
+def deduplicate_urls(urls: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for url in urls:
+        if url not in seen:
+            seen.add(url)
+            unique.append(url)
+    return unique
+
+
 def precision_at(results: list[str], relevant: set[str], k: int) -> float:
     if k <= 0:
         return 0.0
@@ -152,7 +162,7 @@ def search(stub: SearchServiceStub, query: str, limit: int, timeout: float) -> l
 
 
 def evaluate_case(stub: SearchServiceStub, case: QueryCase, args: argparse.Namespace) -> dict[str, Any]:
-    returned = search(stub, case.query, args.limit, args.timeout)
+    returned = deduplicate_urls(search(stub, case.query, args.limit, args.timeout))
     relevant = set(case.relevance.keys())
 
     metrics: dict[str, Any] = {

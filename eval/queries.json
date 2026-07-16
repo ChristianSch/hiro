@@ -1,0 +1,221 @@
+[
+  {
+    "query": "automate business operations with AI",
+    "relevant_urls": ["https://aeon-automation.com/"]
+  },
+  {
+    "query": "custom intelligent agents for operations teams",
+    "relevant_urls": ["https://aeon-automation.com/"]
+  },
+  {
+    "query": "document AI and workflow engineering",
+    "relevant_urls": ["https://aeon-automation.com/"]
+  },
+  {
+    "query": "business process automation delivered in weeks",
+    "relevant_urls": ["https://aeon-automation.com/"]
+  },
+  {
+    "query": "Aeon Automation privacy policy",
+    "relevant_urls": ["https://aeon-automation.com/datenschutz"]
+  },
+  {
+    "query": "Informationen zur Verarbeitung personenbezogener Daten",
+    "relevant_urls": ["https://aeon-automation.com/datenschutz"]
+  },
+  {
+    "query": "Aeon Automation legal notice",
+    "relevant_urls": ["https://aeon-automation.com/impressum"]
+  },
+  {
+    "query": "Aeon Automation Impressum",
+    "relevant_urls": ["https://aeon-automation.com/impressum"]
+  },
+  {
+    "query": "book a meeting about AI automation",
+    "relevance": {
+      "https://bookcall.io/u/aeon?utm=aeon-automation.com": 2,
+      "https://aeon-automation.com/": 1
+    }
+  },
+  {
+    "query": "schedule a call with an AI engineer",
+    "relevance": {
+      "https://bookcall.io/u/aeon?utm=aeon-automation.com": 2,
+      "https://bookcall.io/u/fractional-cto?ref=fractionalcto-io": 1
+    }
+  },
+  {
+    "query": "book a fractional CTO consultation",
+    "relevance": {
+      "https://bookcall.io/u/fractional-cto?ref=fractionalcto-io": 2,
+      "https://thefractionalcto.io/": 1
+    }
+  },
+  {
+    "query": "who is Christian Schulze",
+    "relevance": {
+      "https://christianschulze.io/about": 2,
+      "https://christianschulze.io/": 1
+    }
+  },
+  {
+    "query": "AI and full-stack engineer in Frankfurt",
+    "relevance": {
+      "https://christianschulze.io/": 2,
+      "https://christianschulze.io/about": 2,
+      "https://thefractionalcto.io/": 1
+    }
+  },
+  {
+    "query": "engineering depth and commercial judgment",
+    "relevance": {
+      "https://christianschulze.io/about": 2,
+      "https://christianschulze.io/": 1
+    }
+  },
+  {
+    "query": "Christian Schulze professional profile",
+    "relevance": {
+      "https://christianschulze.io/about": 2,
+      "https://www.linkedin.com/in/christian-schulze-ds": 1
+    }
+  },
+  {
+    "query": "Christian Schulze CV",
+    "relevant_urls": ["https://christianschulze.io/cv"]
+  },
+  {
+    "query": "experience skills education and references",
+    "relevant_urls": ["https://christianschulze.io/cv"]
+  },
+  {
+    "query": "writing about AI engineering CTO work and startups",
+    "relevant_urls": ["https://christianschulze.io/posts"]
+  },
+  {
+    "query": "notes on the commercial side of technology",
+    "relevant_urls": ["https://christianschulze.io/posts"]
+  },
+  {
+    "query": "Christian Schulze software projects",
+    "relevant_urls": ["https://christianschulze.io/projects"]
+  },
+  {
+    "query": "selected open source projects",
+    "relevance": {
+      "https://christianschulze.io/projects": 2,
+      "https://github.com/ChristianSch": 1
+    }
+  },
+  {
+    "query": "multi-harness agent communication over Tailscale",
+    "relevant_urls": ["https://christianschulze.io/projects/agentbridge"]
+  },
+  {
+    "query": "Agentbridge open source tooling",
+    "relevant_urls": ["https://christianschulze.io/projects/agentbridge"]
+  },
+  {
+    "query": "AI-native CRM with agentic capabilities",
+    "relevant_urls": ["https://christianschulze.io/projects/crme"]
+  },
+  {
+    "query": "open source agentic CRM",
+    "relevant_urls": ["https://christianschulze.io/projects/crme"]
+  },
+  {
+    "query": "internet crawler and hybrid search engine",
+    "relevant_urls": ["https://christianschulze.io/projects/hiro"]
+  },
+  {
+    "query": "Hiro hybrid retrieval project",
+    "relevant_urls": ["https://christianschulze.io/projects/hiro"]
+  },
+  {
+    "query": "Christian Schulze GitHub repositories",
+    "relevant_urls": ["https://github.com/ChristianSch"]
+  },
+  {
+    "query": "GitHub profile with 185 repositories",
+    "relevant_urls": ["https://github.com/ChristianSch"]
+  },
+  {
+    "query": "babeneso GitHub profile",
+    "relevant_urls": ["https://github.com/babeneso"]
+  },
+  {
+    "query": "Neso GitHub repository",
+    "relevant_urls": ["https://github.com/babeneso"]
+  },
+  {
+    "query": "fast open source static site generator",
+    "relevant_urls": ["https://gohugo.io/"]
+  },
+  {
+    "query": "Hugo framework for building websites",
+    "relevant_urls": ["https://gohugo.io/"]
+  },
+  {
+    "query": "build websites with speed and flexibility",
+    "relevant_urls": ["https://gohugo.io/"]
+  },
+  {
+    "query": "fractional CTO in Frankfurt",
+    "relevance": {
+      "https://thefractionalcto.io/": 2,
+      "https://christianschulze.io/about": 1
+    }
+  },
+  {
+    "query": "build an AI product or SaaS MVP",
+    "relevance": {
+      "https://thefractionalcto.io/": 2,
+      "https://aeon-automation.com/": 1
+    }
+  },
+  {
+    "query": "fractional CTO who embeds with the team",
+    "relevant_urls": ["https://thefractionalcto.io/"]
+  },
+  {
+    "query": "hands-on fractional CTO and builder",
+    "relevant_urls": ["https://thefractionalcto.io/"]
+  },
+  {
+    "query": "thefractionalcto.io legal notice",
+    "relevant_urls": ["https://thefractionalcto.io/impressum"]
+  },
+  {
+    "query": "Christian Schulze LinkedIn",
+    "relevant_urls": ["https://www.linkedin.com/in/christian-schulze-ds"]
+  },
+  {
+    "query": "lead and fix engineering teams",
+    "relevant_urls": ["https://www.linkedin.com/in/christian-schulze-ds"]
+  },
+  {
+    "query": "software product leader with 500 connections in Frankfurt",
+    "relevant_urls": ["https://www.linkedin.com/in/christian-schulze-ds"]
+  },
+  {
+    "query": "contact Christian about building an AI product",
+    "relevance": {
+      "https://bookcall.io/u/fractional-cto?ref=fractionalcto-io": 2,
+      "https://bookcall.io/u/aeon?utm=aeon-automation.com": 2,
+      "https://thefractionalcto.io/": 1
+    }
+  },
+  {
+    "query": "workflow automation for an operations team",
+    "relevant_urls": ["https://aeon-automation.com/"]
+  },
+  {
+    "query": "open source tools for AI agents",
+    "relevance": {
+      "https://christianschulze.io/projects/agentbridge": 2,
+      "https://christianschulze.io/projects/crme": 1,
+      "https://github.com/ChristianSch": 1
+    }
+  }
+]
