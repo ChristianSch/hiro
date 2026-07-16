@@ -25,6 +25,9 @@ services:
     run: uv run python -m wintermute.embed.server
     watch:
       - wintermute/embed/**/*.py
+      - wintermute/*.py
+      - config/global.yml
+      - config/embed.yml
       - pyproject.toml
       - uv.lock
     depends_on:
@@ -42,10 +45,15 @@ services:
     run: uv run python -m wintermute.search.server
     watch:
       - wintermute/search/**/*.py
+      - wintermute/embed/stubs/*.py
+      - wintermute/*.py
+      - config/global.yml
+      - config/search.yml
       - pyproject.toml
       - uv.lock
     depends_on:
       migrations: completed
+      embed: healthy
     health:
       tcp: localhost:50053
 
@@ -56,6 +64,8 @@ services:
       - "**/*.go"
       - views/**/*.gohtml
       - static/*.css
+      - ../config/global.yml
+      - ../config/web.yml
     ignore:
       - static/**
     depends_on:
