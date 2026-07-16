@@ -54,8 +54,26 @@ func TestSearchMapsPagination(t *testing.T) {
 	if page.PageNumber != 2 || !page.HasPrevious || !page.HasNext {
 		t.Fatalf("unexpected page metadata: %#v", page)
 	}
+	if page.LoadTime == "" {
+		t.Fatal("expected search load time")
+	}
 	if len(page.Results) != 1 || page.Results[0].Page != "/docs" {
 		t.Fatalf("unexpected mapped results: %#v", page.Results)
+	}
+}
+
+func TestFormatSearchDuration(t *testing.T) {
+	t.Parallel()
+
+	cases := map[time.Duration]string{
+		500 * time.Microsecond:  "< 1 ms",
+		126 * time.Millisecond:  "126 ms",
+		1250 * time.Millisecond: "1.2 s",
+	}
+	for duration, expected := range cases {
+		if actual := formatSearchDuration(duration); actual != expected {
+			t.Errorf("formatSearchDuration(%s) = %q, want %q", duration, actual, expected)
+		}
 	}
 }
 

@@ -42,6 +42,7 @@ type SearchPage struct {
 	PageNumber  int
 	HasPrevious bool
 	HasNext     bool
+	LoadTime    string
 }
 
 type ServiceStatus struct {
@@ -115,6 +116,7 @@ func (s *GrpcSearcher) Search(ctx context.Context, query string, pageNumber, res
 	requestCtx, cancel := s.requestContext(ctx)
 	defer cancel()
 	zap.L().Info("searching via grpc", zap.Int("page", pageNumber))
+	started := time.Now()
 	r, err := s.client.Search(requestCtx, &pb.SearchRequest{
 		Query:         query,
 		PageNumber:    int32(pageNumber),
@@ -155,5 +157,16 @@ func (s *GrpcSearcher) Search(ctx context.Context, query string, pageNumber, res
 		PageNumber:  page,
 		HasPrevious: page > 1,
 		HasNext:     r.HasNext,
+		LoadTime:    formatSearchDuration(time.Since(started)),
 	}, nil
+}
+
+func formatSearchDuration(duration time.Duration) string {
+	if duration < time.Millisecond {
+		return "< 1 ms"
+	}
+	if duration < time.Second {
+		return fmt.Sprintf("%d ms", duration.Round(time.Millisecond)/time.Millisecond)
+	}
+	return fmt.Sprintf("%.1f s", duration.Seconds())
 }
