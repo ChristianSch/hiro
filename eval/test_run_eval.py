@@ -1,29 +1,41 @@
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
-from .run_eval import deduplicate_urls, recall_at
+from .run_eval import load_cases, recall_at
 
 
 class EvaluationMetricsTest(unittest.TestCase):
-    def test_deduplicates_normalized_result_urls_in_order(self):
+    def test_loads_urls_without_rewriting_them(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "queries.json"
+            path.write_text(
+                json.dumps(
+                    [
+                        {
+                            "query": "example",
+                            "relevant_urls": ["https://EXAMPLE.com"],
+                        }
+                    ]
+                )
+            )
+
+            cases = load_cases(path)
+
         self.assertEqual(
-            ["https://example.com/", "https://example.com/about"],
-            deduplicate_urls(
-                [
-                    "https://example.com/",
-                    "https://example.com/",
-                    "https://example.com/about",
-                ]
-            ),
+            {"https://EXAMPLE.com": 1.0},
+            cases[0].relevance,
         )
 
-    def test_duplicate_results_cannot_inflate_recall_after_deduplication(self):
-        results = deduplicate_urls(
-            ["https://example.com/", "https://example.com/"]
-        )
-
+    def test_recall_uses_stored_urls_directly(self):
         self.assertEqual(
             1.0,
-            recall_at(results, {"https://example.com/"}, k=10),
+            recall_at(
+                ["https://example.com/"],
+                {"https://example.com/"},
+                k=10,
+            ),
         )
 
 

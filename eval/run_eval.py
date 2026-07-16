@@ -41,7 +41,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from wintermute.search.stubs.search_pb2 import SearchRequest  # noqa: E402
-from wintermute.url_utils import canonicalize_url  # noqa: E402
 from wintermute.search.stubs.search_pb2_grpc import SearchServiceStub  # noqa: E402
 
 
@@ -49,11 +48,6 @@ from wintermute.search.stubs.search_pb2_grpc import SearchServiceStub  # noqa: E
 class QueryCase:
     query: str
     relevance: dict[str, float]
-
-
-def normalize_url(url: str) -> str:
-    """Normalize URLs for matching eval labels to returned results."""
-    return canonicalize_url(url)
 
 
 def load_cases(path: Path) -> list[QueryCase]:
@@ -72,12 +66,12 @@ def load_cases(path: Path) -> list[QueryCase]:
 
         if "relevance" in item:
             relevance = {
-                normalize_url(url): float(score)
+                url: float(score)
                 for url, score in item["relevance"].items()
                 if float(score) > 0
             }
         elif "relevant_urls" in item:
-            relevance = {normalize_url(url): 1.0 for url in item["relevant_urls"]}
+            relevance = {url: 1.0 for url in item["relevant_urls"]}
         else:
             raise ValueError(f"case {i} needs 'relevant_urls' or 'relevance'")
 
@@ -87,16 +81,6 @@ def load_cases(path: Path) -> list[QueryCase]:
         cases.append(QueryCase(query=query, relevance=relevance))
 
     return cases
-
-
-def deduplicate_urls(urls: list[str]) -> list[str]:
-    seen: set[str] = set()
-    unique: list[str] = []
-    for url in urls:
-        if url not in seen:
-            seen.add(url)
-            unique.append(url)
-    return unique
 
 
 def precision_at(results: list[str], relevant: set[str], k: int) -> float:
@@ -154,11 +138,11 @@ def search(stub: SearchServiceStub, query: str, limit: int, timeout: float) -> l
         SearchRequest(query=query, page_number=1, result_per_page=limit),
         timeout=timeout,
     )
-    return [normalize_url(result.url) for result in response.results]
+    return [result.url for result in response.results]
 
 
 def evaluate_case(stub: SearchServiceStub, case: QueryCase, args: argparse.Namespace) -> dict[str, Any]:
-    returned = deduplicate_urls(search(stub, case.query, args.limit, args.timeout))
+    returned = search(stub, case.query, args.limit, args.timeout)
     relevant = set(case.relevance.keys())
 
     metrics: dict[str, Any] = {
