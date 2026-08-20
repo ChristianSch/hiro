@@ -1,5 +1,7 @@
 # Hiro Search + AI Knowledgebase
 
+Moved to [tangled](https://tangled.org/andinfinity.bsky.social/hiro)
+
 ## Project Overview
 
 Hiro is a local semantic search engine / AI knowledgebase. It crawls web pages, turns their content into embeddings with a SentenceTransformer model, stores those embeddings in Postgres using pgvector, and exposes a small web UI for vector-based search.
